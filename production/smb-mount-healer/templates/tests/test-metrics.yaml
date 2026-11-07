@@ -1,0 +1,50 @@
+{{- if .Values.metrics.service.enabled }}
+{{- $ctx := dict "context" . "component" "controlplane" }}
+# `helm test`: the control plane answers on its metrics Service and exports
+# smb_mount_healer_build_info.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "smb-mount-healer.fullname" . }}-test-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "smb-mount-healer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: metrics
+      image: {{ .Values.tests.image }}
+      command:
+        - sh
+        - -c
+        - >-
+          wget -qO- -T 10
+          http://{{ include "smb-mount-healer.componentName" $ctx }}-metrics.{{ .Release.Namespace }}.svc:8080/metrics
+          | grep '^smb_mount_healer_build_info{'
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+{{- end }}

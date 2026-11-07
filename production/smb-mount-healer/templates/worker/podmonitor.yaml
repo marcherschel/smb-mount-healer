@@ -1,0 +1,23 @@
+{{- if .Values.metrics.podMonitor.enabled }}
+{{- include "smb-mount-healer.requirePodMonitor" . }}
+{{- $ctx := dict "context" . "component" "worker" }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "smb-mount-healer.componentName" $ctx }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "smb-mount-healer.componentLabels" $ctx | nindent 4 }}
+    {{- with .Values.metrics.podMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "smb-mount-healer.selectorLabels" $ctx | nindent 6 }}
+  podMetricsEndpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: {{ .Values.metrics.podMonitor.interval }}
+      honorLabels: {{ .Values.metrics.podMonitor.honorLabels }}
+{{- end }}

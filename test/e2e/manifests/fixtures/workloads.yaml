@@ -1,0 +1,388 @@
+# Heartbeat workloads (plan Step 3, Fixtures). Each pod writes hb-$POD_NAME
+# (unix seconds) into every mounted share every 2s; the suite reads them back
+# from the samba side. All pinned to the agent node (label set in k3d.yaml).
+# Replica counts are the baseline the framework restores/asserts
+# (framework/fixtures.go: Workloads); keep them in sync.
+#
+#   deploy-single  Deployment  config-a                  S4, S12*
+#   sts-single     StatefulSet config-b                  S5
+#   two-vol        Deployment  config-c + dl             S11 (transmission shape)
+#   cotenant-a/b   Deployment  library (shared RWX)    S9, S10, S15
+#   landmine-app   Deployment  landmine, replicas 0      S8 (PV known, never staged by kubelet)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-single
+  namespace: smbmh-fixtures
+  labels:
+    app.kubernetes.io/name: deploy-single
+    smbmh-e2e/fixture: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: deploy-single
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: deploy-single
+        smbmh-e2e/fixture: "true"
+    spec:
+      nodeSelector:
+        e2e.smbhealer.herschel.io/fixtures: "true"
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: heartbeat
+          image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                for d in $HB_DIRS; do
+                  date +%s > "$d/hb-$POD_NAME" || echo "heartbeat write to $d failed"
+                done
+                sleep 2
+              done
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HB_DIRS
+              value: "/data"
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              memory: 16Mi
+          volumeMounts:
+            - name: config-a
+              mountPath: /data
+      volumes:
+        - name: config-a
+          persistentVolumeClaim:
+            claimName: storagebox-e2e-config-a-claim
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sts-single
+  namespace: smbmh-fixtures
+  labels:
+    app.kubernetes.io/name: sts-single
+    smbmh-e2e/fixture: "true"
+spec:
+  replicas: 1
+  serviceName: sts-single
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sts-single
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sts-single
+        smbmh-e2e/fixture: "true"
+    spec:
+      nodeSelector:
+        e2e.smbhealer.herschel.io/fixtures: "true"
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: heartbeat
+          image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                for d in $HB_DIRS; do
+                  date +%s > "$d/hb-$POD_NAME" || echo "heartbeat write to $d failed"
+                done
+                sleep 2
+              done
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HB_DIRS
+              value: "/data"
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              memory: 16Mi
+          volumeMounts:
+            - name: config-b
+              mountPath: /data
+      volumes:
+        - name: config-b
+          persistentVolumeClaim:
+            claimName: storagebox-e2e-config-b-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sts-single
+  namespace: smbmh-fixtures
+  labels:
+    app.kubernetes.io/name: sts-single
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: sts-single
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: two-vol
+  namespace: smbmh-fixtures
+  labels:
+    app.kubernetes.io/name: two-vol
+    smbmh-e2e/fixture: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: two-vol
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: two-vol
+        smbmh-e2e/fixture: "true"
+    spec:
+      nodeSelector:
+        e2e.smbhealer.herschel.io/fixtures: "true"
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: heartbeat
+          image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                for d in $HB_DIRS; do
+                  date +%s > "$d/hb-$POD_NAME" || echo "heartbeat write to $d failed"
+                done
+                sleep 2
+              done
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HB_DIRS
+              value: "/config /downloads"
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              memory: 16Mi
+          volumeMounts:
+            - name: config-c
+              mountPath: /config
+            - name: dl
+              mountPath: /downloads
+      volumes:
+        - name: config-c
+          persistentVolumeClaim:
+            claimName: storagebox-e2e-config-c-claim
+        - name: dl
+          persistentVolumeClaim:
+            claimName: storagebox-e2e-dl-claim
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cotenant-a
+  namespace: smbmh-fixtures
+  labels:
+    app.kubernetes.io/name: cotenant-a
+    smbmh-e2e/fixture: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cotenant-a
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cotenant-a
+        smbmh-e2e/fixture: "true"
+    spec:
+      nodeSelector:
+        e2e.smbhealer.herschel.io/fixtures: "true"
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: heartbeat
+          image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                for d in $HB_DIRS; do
+                  date +%s > "$d/hb-$POD_NAME" || echo "heartbeat write to $d failed"
+                done
+                sleep 2
+              done
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HB_DIRS
+              value: "/data"
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              memory: 16Mi
+          volumeMounts:
+            - name: library
+              mountPath: /data
+      volumes:
+        - name: library
+          persistentVolumeClaim:
+            claimName: storagebox-e2e-library-claim
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cotenant-b
+  namespace: smbmh-fixtures
+  labels:
+    app.kubernetes.io/name: cotenant-b
+    smbmh-e2e/fixture: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cotenant-b
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cotenant-b
+        smbmh-e2e/fixture: "true"
+    spec:
+      nodeSelector:
+        e2e.smbhealer.herschel.io/fixtures: "true"
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: heartbeat
+          image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                for d in $HB_DIRS; do
+                  date +%s > "$d/hb-$POD_NAME" || echo "heartbeat write to $d failed"
+                done
+                sleep 2
+              done
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HB_DIRS
+              value: "/data"
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              memory: 16Mi
+          volumeMounts:
+            - name: library
+              mountPath: /data
+      volumes:
+        - name: library
+          persistentVolumeClaim:
+            claimName: storagebox-e2e-library-claim
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: landmine-app
+  namespace: smbmh-fixtures
+  labels:
+    app.kubernetes.io/name: landmine-app
+    smbmh-e2e/fixture: "true"
+spec:
+  replicas: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: landmine-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: landmine-app
+        smbmh-e2e/fixture: "true"
+    spec:
+      nodeSelector:
+        e2e.smbhealer.herschel.io/fixtures: "true"
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: heartbeat
+          image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                for d in $HB_DIRS; do
+                  date +%s > "$d/hb-$POD_NAME" || echo "heartbeat write to $d failed"
+                done
+                sleep 2
+              done
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HB_DIRS
+              value: "/data"
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              memory: 16Mi
+          volumeMounts:
+            - name: landmine
+              mountPath: /data
+      volumes:
+        - name: landmine
+          persistentVolumeClaim:
+            claimName: storagebox-e2e-landmine-claim

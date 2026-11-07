@@ -1,0 +1,146 @@
+{{- $component := "controlplane" }}
+{{- $ctx := dict "context" . "component" $component }}
+{{- $r := .Values.controlplane.remediation }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "smb-mount-healer.componentName" $ctx }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "smb-mount-healer.componentLabels" $ctx | nindent 4 }}
+  annotations:
+    smbhealer.herschel.io/dry-run: {{ .Values.dryRun | toString | quote }}
+spec:
+  # Exactly one active decision maker; leader election (a Lease in the release
+  # namespace) guards rollouts, restarts and extra replicas.
+  replicas: {{ .Values.controlplane.replicas }}
+  selector:
+    matchLabels:
+      {{- include "smb-mount-healer.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "smb-mount-healer.componentLabels" $ctx | nindent 8 }}
+        {{- with .Values.controlplane.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        smbhealer.herschel.io/dry-run: {{ .Values.dryRun | toString | quote }}
+        {{- with .Values.controlplane.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "smb-mount-healer.serviceAccountName" $ctx }}
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controlplane.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      {{- with .Values.controlplane.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controlplane.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controlplane.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controlplane.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: smb-mount-healer
+          image: {{ include "smb-mount-healer.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --controlplane
+            - --leader-elect={{ .Values.controlplane.leaderElection.enabled }}
+            - --zap-log-level={{ .Values.logging.level }}
+            - --zap-encoder={{ .Values.logging.encoder }}
+            {{- if .Values.dryRun }}
+            - --dry-run
+            {{- end }}
+          env:
+            # Leader-election Lease namespace (LEADER_ELECTION_NAMESPACE unset).
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: LEADER_ELECTION_ID
+              value: {{ include "smb-mount-healer.componentName" $ctx | quote }}
+            - name: CSI_DRIVER_NAME
+              value: {{ .Values.csi.driverName | quote }}
+            - name: CSI_NODE_DRIVER_NAMESPACE
+              value: {{ .Values.csi.nodeDriver.namespace | quote }}
+            - name: CSI_NODE_DRIVER_LABEL_SELECTOR
+              value: {{ .Values.csi.nodeDriver.labelSelector | quote }}
+            - name: SCALE_DOWN_WAIT
+              value: {{ $r.scaleDownWait | quote }}
+            - name: UNSTAGE_WAIT
+              value: {{ $r.unstageWait | quote }}
+            - name: QUARANTINE_UNSTAGE_WAIT
+              value: {{ $r.quarantineUnstageWait | quote }}
+            - name: DRIVER_RESTART_WAIT
+              value: {{ $r.driverRestartWait | quote }}
+            - name: VERIFY_WAIT
+              value: {{ $r.verifyWait | quote }}
+            - name: VERIFY_NO_POD_GRACE
+              value: {{ $r.verifyNoPodGrace | quote }}
+            - name: EPISODE_MAX_DURATION
+              value: {{ $r.episodeMaxDuration | quote }}
+            - name: BACKOFF_BASE
+              value: {{ $r.backoffBase | quote }}
+            - name: BACKOFF_MAX
+              value: {{ $r.backoffMax | quote }}
+            - name: POLL_INTERVAL
+              value: {{ $r.pollInterval | quote }}
+            - name: PLANNING_PROBE_WAIT
+              value: {{ $r.planningProbeWait | quote }}
+            - name: REMEDIATION_RETENTION
+              value: {{ $r.retention | quote }}
+            - name: REMEDIATION_RETAIN_MIN_PER_NODE
+              value: {{ $r.retainMinPerNode | int64 | toString | quote }}
+            {{- with .Values.controlplane.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http-metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.controlplane.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.controlplane.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi

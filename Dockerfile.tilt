@@ -1,0 +1,22 @@
+# Dev/e2e image for Tilt (docker_build in test/e2e/Tiltfile): same build, no
+# symbol stripping, and the distroless :debug runtime which ships a busybox
+# shell for poking around in e2e.
+FROM golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS build
+
+ENV CGO_ENABLED=0 \
+    GOTOOLCHAIN=local
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+COPY api/ api/
+COPY cmd/ cmd/
+COPY internal/ internal/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags "-X main.version=tilt -X main.revision=dev" -o /out/smb-mount-healer ./cmd/smb-mount-healer
+
+FROM gcr.io/distroless/static-debian12:debug@sha256:e60a053e6dd251ece065cc35e08c28f4ed55c559eeeb9102553bb09d5c0b0ad1
+COPY --from=build /out/smb-mount-healer /smb-mount-healer
+ENTRYPOINT ["/smb-mount-healer"]

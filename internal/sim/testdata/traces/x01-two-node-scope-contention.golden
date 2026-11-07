@@ -1,0 +1,154 @@
+{"t":"00:02:00","kind":"baseline","msg":"Deployment/apps/spread=2"}
+{"t":"00:02:10","kind":"inject","msg":"umount -l gm(library) on n1 and n2; delete both pods of spread"}
+{"t":"00:02:10","kind":"pod","obj":"apps/spread-5d8f7c9b6-001","msg":"deleting"}
+{"t":"00:02:10","kind":"pod","obj":"apps/spread-5d8f7c9b6-002","msg":"deleting"}
+{"t":"00:02:10","kind":"pod","obj":"apps/spread-5d8f7c9b6-003","msg":"created on n1"}
+{"t":"00:02:10","kind":"pod","obj":"apps/spread-5d8f7c9b6-004","msg":"created on n2"}
+{"t":"00:02:10","kind":"kubelet","obj":"n1","msg":"publish library into apps/spread-5d8f7c9b6-003: globalmount not mounted, bound the bare directory (xfs on /dev/vda6)"}
+{"t":"00:02:10","kind":"pod","obj":"apps/spread-5d8f7c9b6-003","msg":"running on n1"}
+{"t":"00:02:10","kind":"kubelet","obj":"n2","msg":"publish library into apps/spread-5d8f7c9b6-004: globalmount not mounted, bound the bare directory (xfs on /dev/vda6)"}
+{"t":"00:02:10","kind":"pod","obj":"apps/spread-5d8f7c9b6-004","msg":"running on n2"}
+{"t":"00:02:10","kind":"smbm","obj":"n1.library","msg":"Unknown gm=dir-with-data pods=[spread-5d8f7c9b6-001:Unknown spread-5d8f7c9b6-003:Unknown]"}
+{"t":"00:02:10","kind":"smbm","obj":"n2.library","msg":"Unknown gm=dir-with-data pods=[spread-5d8f7c9b6-002:Unknown spread-5d8f7c9b6-004:Unknown]"}
+{"t":"00:02:14","kind":"pod","obj":"apps/spread-5d8f7c9b6-001","msg":"gone"}
+{"t":"00:02:14","kind":"pod","obj":"apps/spread-5d8f7c9b6-002","msg":"gone"}
+{"t":"00:02:14","kind":"smbm","obj":"n1.library","msg":"Unknown gm=dir-with-data pods=[spread-5d8f7c9b6-003:Unknown]"}
+{"t":"00:02:14","kind":"smbm","obj":"n2.library","msg":"Unknown gm=dir-with-data pods=[spread-5d8f7c9b6-004:Unknown]"}
+{"t":"00:03:10","kind":"smbm","obj":"n1.library","msg":"Suspect(wrong_fstype) gm=dir-with-data pods=[spread-5d8f7c9b6-003:Suspect(wrong_fstype)]"}
+{"t":"00:03:10","kind":"smbm","obj":"n2.library","msg":"Suspect(wrong_fstype) gm=dir-with-data pods=[spread-5d8f7c9b6-004:Suspect(wrong_fstype)]"}
+{"t":"00:03:16","kind":"event","obj":"SmbMount/n1.library","reason":"Warning/MountBroken","msg":"pod mount pod(apps/spread-5d8f7c9b6-003,library) of pod apps/spread-5d8f7c9b6-003 is Broken (wrong_fstype)","src":"worker/n1"}
+{"t":"00:03:16","kind":"event","obj":"SmbMount/n2.library","reason":"Warning/MountBroken","msg":"pod mount pod(apps/spread-5d8f7c9b6-004,library) of pod apps/spread-5d8f7c9b6-004 is Broken (wrong_fstype)","src":"worker/n2"}
+{"t":"00:03:16","kind":"smbr","obj":"n1-1791676996","msg":"created type=Workload smbMounts=[n1.library] reasons=[wrong_fstype] dryRun=false"}
+{"t":"00:03:16","kind":"stage","obj":"n1-1791676996","to":"pending","reason":"created"}
+{"t":"00:03:16","kind":"stage","obj":"n1-1791676996","from":"pending","to":"planning","reason":"no_scope_conflict"}
+{"t":"00:03:16","kind":"scope","obj":"n1-1791676996","msg":"workloads=[Deployment/apps/spread(orig=2,in_scope)] pvs=[library] drain=[spread-5d8f7c9b6-003]"}
+{"t":"00:03:16","kind":"cmd","obj":"SmbHostTask/n1-1791676996-planning-0","msg":"create [ProbeNow:gm(library)]"}
+{"t":"00:03:16","kind":"smbr","obj":"n2-1791676996","msg":"created type=Workload smbMounts=[n2.library] reasons=[wrong_fstype] dryRun=false"}
+{"t":"00:03:16","kind":"stage","obj":"n2-1791676996","to":"pending","reason":"created"}
+{"t":"00:03:16","kind":"smbm","obj":"n1.library","msg":"Broken(wrong_fstype) gm=dir-with-data pods=[spread-5d8f7c9b6-003:Broken(wrong_fstype)] stage=planning"}
+{"t":"00:03:16","kind":"smbm","obj":"n2.library","msg":"Broken(wrong_fstype) gm=dir-with-data pods=[spread-5d8f7c9b6-004:Broken(wrong_fstype)] stage=pending"}
+{"t":"00:03:17","kind":"stage","obj":"n1-1791676996","from":"planning","to":"draining","reason":"probe_completed"}
+{"t":"00:03:17","kind":"cmd","obj":"Deployment/apps/spread","reason":"scale_down","msg":"scale 2 -> 0"}
+{"t":"00:03:17","kind":"smbt","obj":"n1-1791676996-planning-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:03:17","kind":"smbm","obj":"n1.library","msg":"Broken(wrong_fstype) gm=dir-with-data pods=[spread-5d8f7c9b6-003:Broken(wrong_fstype)] stage=draining"}
+{"t":"00:03:18","kind":"pod","obj":"apps/spread-5d8f7c9b6-004","msg":"deleting"}
+{"t":"00:03:18","kind":"pod","obj":"apps/spread-5d8f7c9b6-003","msg":"deleting"}
+{"t":"00:03:18","kind":"scope","obj":"n1-1791676996","msg":"workloads=[Deployment/apps/spread(orig=2,scaled_down)] pvs=[library] drain=[spread-5d8f7c9b6-003]"}
+{"t":"00:03:18","kind":"smbm","obj":"n1.library","msg":"Unknown gm=dir-with-data pods=[spread-5d8f7c9b6-003:Unknown] stage=draining"}
+{"t":"00:03:18","kind":"smbm","obj":"n2.library","msg":"Unknown gm=dir-with-data pods=[spread-5d8f7c9b6-004:Unknown] stage=pending"}
+{"t":"00:03:22","kind":"pod","obj":"apps/spread-5d8f7c9b6-003","msg":"gone"}
+{"t":"00:03:22","kind":"kubelet","obj":"n1","msg":"unstage library failed: remove gm(library): directory not empty (attempt 1, retry in 500ms)"}
+{"t":"00:03:22","kind":"pod","obj":"apps/spread-5d8f7c9b6-004","msg":"gone"}
+{"t":"00:03:22","kind":"kubelet","obj":"n2","msg":"unstage library failed: remove gm(library): directory not empty (attempt 1, retry in 500ms)"}
+{"t":"00:03:22","kind":"stage","obj":"n1-1791676996","from":"draining","to":"releasing_mounts","reason":"drained"}
+{"t":"00:03:22","kind":"stage","obj":"n1-1791676996","from":"releasing_mounts","to":"awaiting_unstage","reason":"nothing_to_do"}
+{"t":"00:03:22","kind":"stage","obj":"n1-1791676996","from":"awaiting_unstage","to":"quarantining","reason":"nothing_to_do"}
+{"t":"00:03:22","kind":"cmd","obj":"SmbHostTask/n1-1791676996-quarantining-0","msg":"create [Quarantine:gm(library)?NotMountpoint]"}
+{"t":"00:03:22","kind":"smbm","obj":"n1.library","msg":"Unknown gm=dir-with-data stage=quarantining"}
+{"t":"00:03:22","kind":"smbm","obj":"n2.library","msg":"Unknown gm=dir-with-data stage=pending"}
+{"t":"00:03:23","kind":"kubelet","obj":"n1","msg":"unstage library failed: remove gm(library): directory not empty (attempt 2, retry in 1s)"}
+{"t":"00:03:23","kind":"kubelet","obj":"n2","msg":"unstage library failed: remove gm(library): directory not empty (attempt 2, retry in 1s)"}
+{"t":"00:03:23","kind":"event","obj":"SmbQuarantine/n1.library-20261011t000323z","reason":"Warning/ShadowDataQuarantined","msg":"quarantine folder q/library-20261011T000323Z holds 1 file(s), 64 byte(s) of shadow data of PV library; move the data off the node to resolve","src":"worker/n1"}
+{"t":"00:03:23","kind":"stage","obj":"n1-1791676996","from":"quarantining","to":"awaiting_unstage_completion","reason":"host_task_completed"}
+{"t":"00:03:23","kind":"smbt","obj":"n1-1791676996-quarantining-0","to":"Succeeded","msg":"[quarantine-000=Succeeded->q/library-20261011T000323Z(1 entries)]"}
+{"t":"00:03:23","kind":"smbm","obj":"n1.library","msg":"Unknown gm=empty-dir stage=awaiting_unstage_completion"}
+{"t":"00:03:23","kind":"smbq","obj":"n1.library-20261011t000323z","msg":"created pv=library files=1 entries=1 bytes=64 source=gm(library) remediationRef=\"n1-1791676996\""}
+{"t":"00:03:24","kind":"kubelet","obj":"n1","msg":"unstage library: ok (attempt 3), globalmount dir removed"}
+{"t":"00:03:24","kind":"stage","obj":"n1-1791676996","from":"awaiting_unstage_completion","to":"restarting_driver","reason":"unstage_completed"}
+{"t":"00:03:24","kind":"cmd","obj":"Pod/kube-system/csi-smb-node-n1-1","reason":"driver_restart","msg":"delete"}
+{"t":"00:03:24","kind":"smbm","obj":"n1.library","msg":"Unknown gm=absent quarantines=1 stage=restarting_driver"}
+{"t":"00:03:27","kind":"driver","obj":"csi-smb-node-n1-2","msg":"created"}
+{"t":"00:03:32","kind":"driver","obj":"csi-smb-node-n1-2","msg":"ready"}
+{"t":"00:03:32","kind":"stage","obj":"n1-1791676996","from":"restarting_driver","to":"scaling_up","reason":"driver_ready"}
+{"t":"00:03:32","kind":"cmd","obj":"Deployment/apps/spread","reason":"scale_up","msg":"scale 0 -> 2"}
+{"t":"00:03:32","kind":"smbm","obj":"n1.library","msg":"Unknown gm=absent quarantines=1 stage=scaling_up"}
+{"t":"00:03:33","kind":"pod","obj":"apps/spread-5d8f7c9b6-005","msg":"created on n1"}
+{"t":"00:03:33","kind":"pod","obj":"apps/spread-5d8f7c9b6-006","msg":"created on n2"}
+{"t":"00:03:33","kind":"kubelet","obj":"n1","msg":"stage library: mounted cifs //samba.e2e.svc.cluster.local/library"}
+{"t":"00:03:33","kind":"kubelet","obj":"n1","msg":"publish library into apps/spread-5d8f7c9b6-005: bind of the globalmount (cifs)"}
+{"t":"00:03:33","kind":"pod","obj":"apps/spread-5d8f7c9b6-005","msg":"running on n1"}
+{"t":"00:03:33","kind":"kubelet","obj":"n2","msg":"unstage of library cancelled: pod apps/spread-5d8f7c9b6-006 wants the volume (volume stays staged)"}
+{"t":"00:03:33","kind":"kubelet","obj":"n2","msg":"publish library into apps/spread-5d8f7c9b6-006: globalmount not mounted, bound the bare directory (xfs on /dev/vda6)"}
+{"t":"00:03:33","kind":"pod","obj":"apps/spread-5d8f7c9b6-006","msg":"running on n2"}
+{"t":"00:03:33","kind":"stage","obj":"n1-1791676996","from":"scaling_up","to":"verifying","reason":"scaled_up"}
+{"t":"00:03:33","kind":"scope","obj":"n1-1791676996","msg":"workloads=[Deployment/apps/spread(orig=2,restored)] pvs=[library] drain=[spread-5d8f7c9b6-003]"}
+{"t":"00:03:33","kind":"verify","obj":"n1-1791676996","msg":"Deployment/apps/spread=pending"}
+{"t":"00:03:33","kind":"cmd","obj":"SmbHostTask/n1-1791676996-verifying-0","msg":"create [ProbeNow:gm(library)]"}
+{"t":"00:03:33","kind":"cmd","obj":"SmbHostTask/n1-1791676996-verifying-1","msg":"create [ProbeNow:pod(apps/spread-5d8f7c9b6-005,library)]"}
+{"t":"00:03:33","kind":"smbm","obj":"n1.library","msg":"Healthy gm=cifs pods=[spread-5d8f7c9b6-005:Unknown] quarantines=1 stage=verifying"}
+{"t":"00:03:33","kind":"smbm","obj":"n2.library","msg":"Unknown gm=dir-with-data pods=[spread-5d8f7c9b6-006:Unknown] stage=pending"}
+{"t":"00:03:34","kind":"smbt","obj":"n1-1791676996-verifying-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:03:34","kind":"smbt","obj":"n1-1791676996-verifying-1","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:04:33","kind":"stage","obj":"n1-1791676996","from":"verifying","to":"finalizing","reason":"verified"}
+{"t":"00:04:33","kind":"stage","obj":"n1-1791676996","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:04:33","kind":"verify","obj":"n1-1791676996","msg":"Deployment/apps/spread=verified"}
+{"t":"00:04:33","kind":"outcome","obj":"n1-1791676996","to":"healed","msg":"remediation finished: 1 workload(s), 1 PV(s)"}
+{"t":"00:04:33","kind":"event","obj":"SmbMountRemediation/n1-1791676996","reason":"Normal/RemediationFinished","msg":"outcome healed: remediation finished: 1 workload(s), 1 PV(s)","src":"controlplane"}
+{"t":"00:04:33","kind":"smbm","obj":"n1.library","msg":"Healthy gm=cifs pods=[spread-5d8f7c9b6-005:Healthy] quarantines=1 last=healed"}
+{"t":"00:04:33","kind":"smbm","obj":"n2.library","msg":"Suspect(wrong_fstype) gm=dir-with-data pods=[spread-5d8f7c9b6-006:Suspect(wrong_fstype)] stage=pending"}
+{"t":"00:04:39","kind":"event","obj":"SmbMount/n2.library","reason":"Warning/MountBroken","msg":"pod mount pod(apps/spread-5d8f7c9b6-006,library) of pod apps/spread-5d8f7c9b6-006 is Broken (wrong_fstype)","src":"worker/n2"}
+{"t":"00:04:39","kind":"stage","obj":"n2-1791676996","from":"pending","to":"planning","reason":"no_scope_conflict"}
+{"t":"00:04:39","kind":"scope","obj":"n2-1791676996","msg":"workloads=[Deployment/apps/spread(orig=2,in_scope)] pvs=[library] drain=[spread-5d8f7c9b6-006]"}
+{"t":"00:04:39","kind":"cmd","obj":"SmbHostTask/n2-1791676996-planning-0","msg":"create [ProbeNow:gm(library)]"}
+{"t":"00:04:39","kind":"smbm","obj":"n2.library","msg":"Broken(wrong_fstype) gm=dir-with-data pods=[spread-5d8f7c9b6-006:Broken(wrong_fstype)] stage=planning"}
+{"t":"00:04:40","kind":"stage","obj":"n2-1791676996","from":"planning","to":"draining","reason":"probe_completed"}
+{"t":"00:04:40","kind":"cmd","obj":"Deployment/apps/spread","reason":"scale_down","msg":"scale 2 -> 0"}
+{"t":"00:04:40","kind":"smbt","obj":"n2-1791676996-planning-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:04:40","kind":"smbm","obj":"n2.library","msg":"Broken(wrong_fstype) gm=dir-with-data pods=[spread-5d8f7c9b6-006:Broken(wrong_fstype)] stage=draining"}
+{"t":"00:04:41","kind":"pod","obj":"apps/spread-5d8f7c9b6-006","msg":"deleting"}
+{"t":"00:04:41","kind":"pod","obj":"apps/spread-5d8f7c9b6-005","msg":"deleting"}
+{"t":"00:04:41","kind":"scope","obj":"n2-1791676996","msg":"workloads=[Deployment/apps/spread(orig=2,scaled_down)] pvs=[library] drain=[spread-5d8f7c9b6-006]"}
+{"t":"00:04:41","kind":"smbm","obj":"n1.library","msg":"Healthy gm=cifs pods=[spread-5d8f7c9b6-005:Unknown] quarantines=1 last=healed"}
+{"t":"00:04:41","kind":"smbm","obj":"n2.library","msg":"Unknown gm=dir-with-data pods=[spread-5d8f7c9b6-006:Unknown] stage=draining"}
+{"t":"00:04:45","kind":"pod","obj":"apps/spread-5d8f7c9b6-005","msg":"gone"}
+{"t":"00:04:45","kind":"kubelet","obj":"n1","msg":"unstage library: ok (attempt 1), globalmount dir removed"}
+{"t":"00:04:45","kind":"pod","obj":"apps/spread-5d8f7c9b6-006","msg":"gone"}
+{"t":"00:04:45","kind":"kubelet","obj":"n2","msg":"unstage library failed: remove gm(library): directory not empty (attempt 1, retry in 500ms)"}
+{"t":"00:04:45","kind":"stage","obj":"n2-1791676996","from":"draining","to":"releasing_mounts","reason":"drained"}
+{"t":"00:04:45","kind":"stage","obj":"n2-1791676996","from":"releasing_mounts","to":"awaiting_unstage","reason":"nothing_to_do"}
+{"t":"00:04:45","kind":"stage","obj":"n2-1791676996","from":"awaiting_unstage","to":"quarantining","reason":"nothing_to_do"}
+{"t":"00:04:45","kind":"cmd","obj":"SmbHostTask/n2-1791676996-quarantining-0","msg":"create [Quarantine:gm(library)?NotMountpoint]"}
+{"t":"00:04:45","kind":"smbm","obj":"n2.library","msg":"Unknown gm=dir-with-data stage=quarantining"}
+{"t":"00:04:45","kind":"smbm","obj":"n1.library","msg":"deleted"}
+{"t":"00:04:46","kind":"kubelet","obj":"n2","msg":"unstage library failed: remove gm(library): directory not empty (attempt 2, retry in 1s)"}
+{"t":"00:04:46","kind":"event","obj":"SmbQuarantine/n2.library-20261011t000446z","reason":"Warning/ShadowDataQuarantined","msg":"quarantine folder q/library-20261011T000446Z holds 2 file(s), 128 byte(s) of shadow data of PV library; move the data off the node to resolve","src":"worker/n2"}
+{"t":"00:04:46","kind":"stage","obj":"n2-1791676996","from":"quarantining","to":"awaiting_unstage_completion","reason":"host_task_completed"}
+{"t":"00:04:46","kind":"smbt","obj":"n2-1791676996-quarantining-0","to":"Succeeded","msg":"[quarantine-000=Succeeded->q/library-20261011T000446Z(2 entries)]"}
+{"t":"00:04:46","kind":"smbm","obj":"n2.library","msg":"Unknown gm=empty-dir stage=awaiting_unstage_completion"}
+{"t":"00:04:46","kind":"smbq","obj":"n2.library-20261011t000446z","msg":"created pv=library files=2 entries=2 bytes=128 source=gm(library) remediationRef=\"n2-1791676996\""}
+{"t":"00:04:47","kind":"kubelet","obj":"n2","msg":"unstage library: ok (attempt 3), globalmount dir removed"}
+{"t":"00:04:47","kind":"stage","obj":"n2-1791676996","from":"awaiting_unstage_completion","to":"restarting_driver","reason":"unstage_completed"}
+{"t":"00:04:47","kind":"cmd","obj":"Pod/kube-system/csi-smb-node-n2-1","reason":"driver_restart","msg":"delete"}
+{"t":"00:04:47","kind":"smbm","obj":"n2.library","msg":"Unknown gm=absent quarantines=1 stage=restarting_driver"}
+{"t":"00:04:50","kind":"driver","obj":"csi-smb-node-n2-2","msg":"created"}
+{"t":"00:04:55","kind":"driver","obj":"csi-smb-node-n2-2","msg":"ready"}
+{"t":"00:04:55","kind":"stage","obj":"n2-1791676996","from":"restarting_driver","to":"scaling_up","reason":"driver_ready"}
+{"t":"00:04:55","kind":"cmd","obj":"Deployment/apps/spread","reason":"scale_up","msg":"scale 0 -> 2"}
+{"t":"00:04:55","kind":"smbm","obj":"n2.library","msg":"Unknown gm=absent quarantines=1 stage=scaling_up"}
+{"t":"00:04:56","kind":"pod","obj":"apps/spread-5d8f7c9b6-007","msg":"created on n1"}
+{"t":"00:04:56","kind":"pod","obj":"apps/spread-5d8f7c9b6-008","msg":"created on n2"}
+{"t":"00:04:56","kind":"kubelet","obj":"n1","msg":"stage library: mounted cifs //samba.e2e.svc.cluster.local/library"}
+{"t":"00:04:56","kind":"kubelet","obj":"n1","msg":"publish library into apps/spread-5d8f7c9b6-007: bind of the globalmount (cifs)"}
+{"t":"00:04:56","kind":"pod","obj":"apps/spread-5d8f7c9b6-007","msg":"running on n1"}
+{"t":"00:04:56","kind":"kubelet","obj":"n2","msg":"stage library: mounted cifs //samba.e2e.svc.cluster.local/library"}
+{"t":"00:04:56","kind":"kubelet","obj":"n2","msg":"publish library into apps/spread-5d8f7c9b6-008: bind of the globalmount (cifs)"}
+{"t":"00:04:56","kind":"pod","obj":"apps/spread-5d8f7c9b6-008","msg":"running on n2"}
+{"t":"00:04:56","kind":"stage","obj":"n2-1791676996","from":"scaling_up","to":"verifying","reason":"scaled_up"}
+{"t":"00:04:56","kind":"scope","obj":"n2-1791676996","msg":"workloads=[Deployment/apps/spread(orig=2,restored)] pvs=[library] drain=[spread-5d8f7c9b6-006]"}
+{"t":"00:04:56","kind":"verify","obj":"n2-1791676996","msg":"Deployment/apps/spread=pending"}
+{"t":"00:04:56","kind":"cmd","obj":"SmbHostTask/n2-1791676996-verifying-0","msg":"create [ProbeNow:gm(library)]"}
+{"t":"00:04:56","kind":"cmd","obj":"SmbHostTask/n2-1791676996-verifying-1","msg":"create [ProbeNow:pod(apps/spread-5d8f7c9b6-008,library)]"}
+{"t":"00:04:56","kind":"smbm","obj":"n1.library","msg":"Healthy gm=cifs pods=[spread-5d8f7c9b6-007:Unknown] quarantines=1 last=healed"}
+{"t":"00:04:56","kind":"smbm","obj":"n2.library","msg":"Healthy gm=cifs pods=[spread-5d8f7c9b6-008:Unknown] quarantines=1 stage=verifying"}
+{"t":"00:04:57","kind":"smbt","obj":"n2-1791676996-verifying-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:04:57","kind":"smbt","obj":"n2-1791676996-verifying-1","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:05:56","kind":"stage","obj":"n2-1791676996","from":"verifying","to":"finalizing","reason":"verified"}
+{"t":"00:05:56","kind":"stage","obj":"n2-1791676996","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:05:56","kind":"verify","obj":"n2-1791676996","msg":"Deployment/apps/spread=verified"}
+{"t":"00:05:56","kind":"outcome","obj":"n2-1791676996","to":"healed","msg":"remediation finished: 1 workload(s), 1 PV(s)"}
+{"t":"00:05:56","kind":"event","obj":"SmbMountRemediation/n2-1791676996","reason":"Normal/RemediationFinished","msg":"outcome healed: remediation finished: 1 workload(s), 1 PV(s)","src":"controlplane"}
+{"t":"00:05:56","kind":"smbm","obj":"n1.library","msg":"Healthy gm=cifs pods=[spread-5d8f7c9b6-007:Healthy] quarantines=1 last=healed"}
+{"t":"00:05:56","kind":"smbm","obj":"n2.library","msg":"Healthy gm=cifs pods=[spread-5d8f7c9b6-008:Healthy] quarantines=1 last=healed"}
+{"t":"00:07:56","kind":"result","msg":"outcomes=[Workload:healed Workload:healed] healed=true"}
+{"t":"00:07:56","kind":"replicas","msg":"Deployment/apps/spread=2/2"}
+{"t":"00:07:56","kind":"metrics","msg":"host_actions_total{action=probe_now,dry_run=false,node=n1,result=succeeded}=3 host_actions_total{action=probe_now,dry_run=false,node=n2,result=succeeded}=3 host_actions_total{action=quarantine,dry_run=false,node=n1,result=succeeded}=1 host_actions_total{action=quarantine,dry_run=false,node=n2,result=succeeded}=1 probes_hung{node=n1}=0 probes_hung{node=n2}=0 quarantines{node=n1,pv=library}=1 quarantines{node=n2,pv=library}=1 remediations_started_total{mode=live,target_node=n1,type=Workload}=1 remediations_started_total{mode=live,target_node=n2,type=Workload}=1 remediations_total{mode=live,outcome=healed,target_node=n1,type=Workload}=1 remediations_total{mode=live,outcome=healed,target_node=n2,type=Workload}=1 workload_actions_total{action=driver_restart,mode=live,result=success}=2 workload_actions_total{action=scale_down,mode=live,result=success}=2 workload_actions_total{action=scale_up,mode=live,result=success}=2 workload_verifications_total{result=verified}=2"}

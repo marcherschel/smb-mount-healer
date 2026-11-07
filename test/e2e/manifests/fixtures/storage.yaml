@@ -1,0 +1,285 @@
+# A typical static csi-driver-smb setup for a hosted SMB share (e.g. a Hetzner
+# Storage Box): one StorageClass, static PVs with name == volumeHandle and
+# PVCs bound via volumeName. The mountOptions are a common set for such a
+# share, deliberately without `soft`: many setups rely on the cifs default,
+# which is soft (S1 asserts it).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: storagebox-e2e
+provisioner: smb.csi.k8s.io
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+mountOptions:
+  - uid=1000
+  - gid=1000
+  - file_mode=0775
+  - dir_mode=0775
+  - vers=3.0
+  - cache=strict
+  - noserverino
+parameters:
+  csi.storage.k8s.io/node-stage-secret-name: storagebox-e2e-credentials
+  csi.storage.k8s.io/node-stage-secret-namespace: kube-system
+  csi.storage.k8s.io/provisioner-secret-name: storagebox-e2e-credentials
+  csi.storage.k8s.io/provisioner-secret-namespace: kube-system
+  source: //samba.smbmh-samba.svc.cluster.local/library
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: storagebox-e2e-config-a
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - uid=1000
+    - gid=1000
+    - file_mode=0775
+    - dir_mode=0775
+    - vers=3.0
+    - cache=strict
+    - noserverino
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: storagebox-e2e-config-a
+    nodeStageSecretRef:
+      name: storagebox-e2e-credentials
+      namespace: kube-system
+    volumeAttributes:
+      source: //samba.smbmh-samba.svc.cluster.local/config-a
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storagebox-e2e-config-a-claim
+  namespace: smbmh-fixtures
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeName: storagebox-e2e-config-a
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: storagebox-e2e-config-b
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - uid=1000
+    - gid=1000
+    - file_mode=0775
+    - dir_mode=0775
+    - vers=3.0
+    - cache=strict
+    - noserverino
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: storagebox-e2e-config-b
+    nodeStageSecretRef:
+      name: storagebox-e2e-credentials
+      namespace: kube-system
+    volumeAttributes:
+      source: //samba.smbmh-samba.svc.cluster.local/config-b
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storagebox-e2e-config-b-claim
+  namespace: smbmh-fixtures
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeName: storagebox-e2e-config-b
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: storagebox-e2e-config-c
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - uid=1000
+    - gid=1000
+    - file_mode=0775
+    - dir_mode=0775
+    - vers=3.0
+    - cache=strict
+    - noserverino
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: storagebox-e2e-config-c
+    nodeStageSecretRef:
+      name: storagebox-e2e-credentials
+      namespace: kube-system
+    volumeAttributes:
+      source: //samba.smbmh-samba.svc.cluster.local/config-c
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storagebox-e2e-config-c-claim
+  namespace: smbmh-fixtures
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeName: storagebox-e2e-config-c
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: storagebox-e2e-dl
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - uid=1000
+    - gid=1000
+    - file_mode=0775
+    - dir_mode=0775
+    - vers=3.0
+    - cache=strict
+    - noserverino
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: storagebox-e2e-dl
+    nodeStageSecretRef:
+      name: storagebox-e2e-credentials
+      namespace: kube-system
+    volumeAttributes:
+      source: //samba.smbmh-samba.svc.cluster.local/dl
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storagebox-e2e-dl-claim
+  namespace: smbmh-fixtures
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeName: storagebox-e2e-dl
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: storagebox-e2e-library
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - uid=1000
+    - gid=1000
+    - file_mode=0775
+    - dir_mode=0775
+    - vers=3.0
+    - cache=strict
+    - noserverino
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: storagebox-e2e-library
+    nodeStageSecretRef:
+      name: storagebox-e2e-credentials
+      namespace: kube-system
+    volumeAttributes:
+      source: //samba.smbmh-samba.svc.cluster.local/library
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storagebox-e2e-library-claim
+  namespace: smbmh-fixtures
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeName: storagebox-e2e-library
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: storagebox-e2e-landmine
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - uid=1000
+    - gid=1000
+    - file_mode=0775
+    - dir_mode=0775
+    - vers=3.0
+    - cache=strict
+    - noserverino
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: storagebox-e2e-landmine
+    nodeStageSecretRef:
+      name: storagebox-e2e-credentials
+      namespace: kube-system
+    volumeAttributes:
+      source: //samba-landmine.smbmh-samba.svc.cluster.local/landmine
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storagebox-e2e-landmine-claim
+  namespace: smbmh-fixtures
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: storagebox-e2e
+  volumeName: storagebox-e2e-landmine
+  resources:
+    requests:
+      storage: 1Gi

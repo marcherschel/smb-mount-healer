@@ -1,0 +1,19 @@
+# Fixtures: SMB storage shaped like a typical static csi-driver-smb setup
+# (Secret in kube-system, StorageClass, static PVs with name == volumeHandle,
+# the same mountOptions, Retain; PVCs bound via volumeName) plus heartbeat
+# workloads pinned to the agent node and the flux-fighter.
+#
+# No top-level `namespace:` on purpose: the node-stage Secret must stay in
+# kube-system (as csi-driver-smb setups usually have it), so every namespaced object sets its own.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: smbmh-e2e
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - credentials.yaml
+  - storage.yaml
+  - workloads.yaml
+  - flux-fighter.yaml

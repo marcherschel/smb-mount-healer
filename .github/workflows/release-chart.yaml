@@ -1,0 +1,160 @@
+name: release-chart
+
+# Chart release: pushing a tag chart-vA.B.C (or chart-vA.B.C-rc.N) publishes
+# the chart exactly as committed (Chart.yaml `version` must be A.B.C):
+#   oci://ghcr.io/<owner>/charts/smb-mount-healer:A.B.C
+#   ghcr.io/<owner>/charts/smb-mount-healer:artifacthub.io  ArtifactHub repository
+#                                    metadata (artifacthub-repo.yml, when present)
+#   GitHub release chart-vA.B.C with dist/chart (make dist-chart): chart
+#   package, Grafana dashboard, Prometheus rule file, PrometheusRule, SHA256SUMS.
+# The chart's appVersion must be a published app release (tags v*,
+# release-app.yaml). The full CI suite gates every publish step.
+
+on:
+  push:
+    tags: ["chart-v[0-9]+.[0-9]+.[0-9]+", "chart-v[0-9]+.[0-9]+.[0-9]+-*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-chart-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: "*"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yaml
+    permissions:
+      contents: read
+      packages: read # pull the CI image from GHCR
+
+  publish:
+    name: Chart
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    container:
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:PLACEHOLDER@sha256:PLACEHOLDER
+      # Pulling the CI image needs credentials while its GHCR package is private.
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    env:
+      IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/smb-mount-healer
+      CHART_REPO: ghcr.io/${{ github.repository_owner }}/charts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to GHCR (helm, oras)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          printf '%s' "$GHCR_TOKEN" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Tag == Chart.yaml version, the version is not published yet, and the
+      # image the chart deploys by default (appVersion) exists.
+      - name: Check versions
+        id: check
+        run: |
+          chart=production/smb-mount-healer/Chart.yaml
+          version=$(yq '.version' "$chart")
+          app_version=$(yq '.appVersion' "$chart")
+          if [ "${GITHUB_REF_NAME#chart-v}" != "$version" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match Chart.yaml version ${version}"
+            exit 1
+          fi
+          # GHCR lets a tag be overwritten, so refuse to re-push a version.
+          if oras manifest fetch "${CHART_REPO}/smb-mount-healer:${version}" >/dev/null 2>&1; then
+            echo "::error::chart smb-mount-healer ${version} is already published; bump Chart.yaml version"
+            exit 1
+          fi
+          if ! oras manifest fetch "${IMAGE_REPO}:${app_version}" >/dev/null; then
+            echo "::error::appVersion ${app_version}: image ${IMAGE_REPO}:${app_version} does not exist (release the app first: tag v${app_version})"
+            exit 1
+          fi
+          echo "chart ${version}, appVersion ${app_version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release assets (make dist-chart)
+        run: make dist-chart CHART_VERSION="$GITHUB_REF_NAME"
+
+      - name: Push chart
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: helm push "dist/chart/smb-mount-healer-${VERSION}.tgz" "oci://${CHART_REPO}"
+
+      # ArtifactHub reads repository metadata (verified publisher, owners) from
+      # the special tag artifacthub.io next to the chart.
+      - name: Push ArtifactHub repository metadata
+        if: hashFiles('artifacthub-repo.yml') != ''
+        run: |
+          oras push "${CHART_REPO}/smb-mount-healer:artifacthub.io" \
+            --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
+            artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-chart
+          path: dist/chart/
+          if-no-files-found: error
+
+  github-release:
+    name: GitHub release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # previous chart tag for the release notes
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-chart
+          path: dist/chart
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          chart=production/smb-mount-healer/Chart.yaml
+          app_version=$(yq '.appVersion' "$chart")
+          # Notes: the curated artifacthub.io/changes of this version, then the
+          # PRs since the previous chart release (never since a v* app tag).
+          notes="${RUNNER_TEMP}/notes.md"
+          {
+            echo "Helm chart \`smb-mount-healer\` ${VERSION}, deploys app version [v${app_version}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${app_version}) by default."
+            echo
+            echo '```sh'
+            echo "helm install smb-mount-healer oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts/smb-mount-healer --version ${VERSION}"
+            echo '```'
+            echo
+            echo "### Changes"
+            yq '.annotations."artifacthub.io/changes"' "$chart" | yq '.[] | "- " + .kind + ": " + .description'
+          } >"$notes"
+          flags=(--generate-notes --verify-tag --notes-file "$notes")
+          previous=$(git -c versionsort.suffix=- tag -l 'chart-v*' --sort=-v:refname | grep -vx "$GITHUB_REF_NAME" | head -1 || true)
+          if [ -n "$previous" ]; then
+            flags+=(--notes-start-tag "$previous")
+          fi
+          if yq -e '.annotations."artifacthub.io/prerelease" == "true"' "$chart" >/dev/null || [[ "$VERSION" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/chart/* --repo "$GITHUB_REPOSITORY" \
+            --title "smb-mount-healer chart ${VERSION}" "${flags[@]}"

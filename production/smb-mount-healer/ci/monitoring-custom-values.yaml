@@ -1,0 +1,21 @@
+# Monitoring objects in Grafana's/Prometheus' namespaces, with selector labels,
+# extra rule labels, a custom runbook base URL and one alert switched off.
+monitoring:
+  grafanaDashboard:
+    enabled: true
+    namespace: grafana
+    labels:
+      grafana_dashboard: "true"
+    annotations:
+      grafana_folder: Storage
+  prometheusRule:
+    enabled: true
+    namespace: monitoring
+    labels:
+      release: kube-prometheus-stack
+    additionalRuleLabels:
+      team: storage
+      severity: page
+    runbookBaseUrl: https://runbooks.example.com/smb/
+    disabledAlerts:
+      - SmbMountHealerShadowDataPending

@@ -1,0 +1,17 @@
+# octo-sts trust policy for .github/workflows/renovate.yaml: the workflow on
+# main exchanges its GitHub OIDC token for a short-lived installation token
+# with these permissions (https://github.com/octo-sts/app). Needs the octo-sts
+# GitHub App installed on this repository.
+issuer: https://token.actions.githubusercontent.com
+subject: repo:marcherschel/smb-mount-healer:ref:refs/heads/main
+claim_pattern:
+  job_workflow_ref: marcherschel/smb-mount-healer/\.github/workflows/renovate\.yaml@refs/heads/main
+
+permissions:
+  checks: write
+  contents: write
+  issues: write
+  members: read
+  pull_requests: write
+  statuses: write
+  workflows: write

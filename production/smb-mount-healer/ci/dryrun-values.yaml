@@ -1,0 +1,2 @@
+# Dry-run mode: the control plane gets --dry-run and the dry-run annotation.
+dryRun: true

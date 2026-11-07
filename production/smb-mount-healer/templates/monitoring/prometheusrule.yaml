@@ -1,0 +1,51 @@
+{{- if .Values.monitoring.prometheusRule.enabled }}
+{{- include "smb-mount-healer.requirePrometheusRule" . }}
+{{- $cfg := .Values.monitoring.prometheusRule }}
+{{- $ctx := dict "context" . "component" "monitoring" }}
+{{- /* Source: monitoring/alerts/smb-mount-healer.rules.yaml (plain rule file). */}}
+{{- $src := .Files.Get "files/smb-mount-healer.rules.yaml" | fromYaml }}
+{{- if hasKey $src "Error" }}
+{{- fail (printf "files/smb-mount-healer.rules.yaml: %s" $src.Error) }}
+{{- end }}
+{{- $known := list }}
+{{- $groups := list }}
+{{- range $group := $src.groups }}
+{{- $rules := list }}
+{{- range $rule := $group.rules }}
+{{- $known = append $known $rule.alert }}
+{{- if not (has $rule.alert $cfg.disabledAlerts) }}
+{{- $rule = deepCopy $rule }}
+{{- /* A rule's own labels (e.g. severity) win over additionalRuleLabels. */}}
+{{- $labels := merge (deepCopy (default (dict) $rule.labels)) (default (dict) $cfg.additionalRuleLabels) }}
+{{- $annotations := default (dict) $rule.annotations }}
+{{- if $cfg.runbookBaseUrl }}
+{{- $_ := set $annotations "runbook_url" (printf "%s/%s.md" (trimSuffix "/" $cfg.runbookBaseUrl) $rule.alert) }}
+{{- end }}
+{{- $_ := set $rule "labels" $labels }}
+{{- $_ = set $rule "annotations" $annotations }}
+{{- $rules = append $rules $rule }}
+{{- end }}
+{{- end }}
+{{- if $rules }}
+{{- $groups = append $groups (dict "name" $group.name "rules" $rules) }}
+{{- end }}
+{{- end }}
+{{- range $cfg.disabledAlerts }}
+{{- if not (has . $known) }}
+{{- fail (printf "monitoring.prometheusRule.disabledAlerts: unknown alert %q (known: %s)" . (join ", " $known)) }}
+{{- end }}
+{{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "smb-mount-healer.fullname" . }}
+  namespace: {{ default .Release.Namespace $cfg.namespace }}
+  labels:
+    {{- include "smb-mount-healer.componentLabels" $ctx | nindent 4 }}
+    {{- with $cfg.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    {{- toYaml $groups | nindent 4 }}
+{{- end }}

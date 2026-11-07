@@ -1,0 +1,121 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "configMigration": true,
+  "extends": [
+    "config:best-practices",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  "minimumReleaseAge": "1 day",
+  "prHourlyLimit": 0,
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "description": "structured-merge-diff majors must follow k8s.io/apimachinery: controller-gen's generated applyconfigurations import the same major client-go uses, so a standalone major bump is dropped by go mod tidy. It arrives with the kubernetes go libraries bump.",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "sigs.k8s.io/structured-merge-diff/**"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Kubernetes releases are tagged vX.Y.Z; versions.env holds X.Y.Z",
+      "matchFileNames": [
+        "versions.env"
+      ],
+      "matchPackageNames": [
+        "kubernetes/kubernetes"
+      ],
+      "extractVersion": "^v(?<version>.+)$"
+    },
+    {
+      "description": "Kubernetes go libraries, controller-runtime and the envtest/k3s versions move together",
+      "groupName": "kubernetes",
+      "matchPackageNames": [
+        "k8s.io/**",
+        "sigs.k8s.io/controller-runtime",
+        "sigs.k8s.io/controller-tools",
+        "sigs.k8s.io/controller-runtime/tools/setup-envtest",
+        "kubernetes/kubernetes",
+        "rancher/k3s"
+      ]
+    },
+    {
+      "description": "An app release moves the chart's appVersion: bump the chart version and record the change (the chart is released on its own chart-v* tags). Needs RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS, set in .github/workflows/renovate.yaml.",
+      "matchFileNames": [
+        "production/smb-mount-healer/Chart.yaml"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/marcherschel/smb-mount-healer"
+      ],
+      "pinDigests": false,
+      "commitMessageTopic": "chart appVersion",
+      "postUpgradeTasks": {
+        "commands": [
+          "hack/bump-chart-version.sh patch 'Default image ghcr.io/marcherschel/smb-mount-healer:{{{newVersion}}}.'"
+        ],
+        "fileFilters": [
+          "production/smb-mount-healer/Chart.yaml"
+        ],
+        "executionMode": "branch"
+      }
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Tool and dependency versions in versions.env",
+      "managerFilePatterns": [
+        "/^versions\\.env$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)(?:\\s+registryUrl=(?<registryUrl>[^\\s]+))?(?:\\s+versioning=(?<versioning>[^\\s]+))?\\n[A-Z0-9_]+=(?<currentValue>[^\\s]+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Digest-pinned images in the chart (helm test pod) and the chart tests (kubeconform, promtool)",
+      "managerFilePatterns": [
+        "/^production/smb-mount-healer/values\\.yaml$/",
+        "/^hack/chart-test\\.sh$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n(?:\\s*#[^\\n]*\\n)*\\s*[A-Za-z_]+[:=]\\s*[^\\s:@]+(?::[^\\s:@]+)?:(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Same digest-pinned images as rendered by helm-docs into the chart README, so the values.yaml bump and the README land in one branch and the 'generated files' check stays green",
+      "managerFilePatterns": [
+        "/^production/smb-mount-healer/README\\.md$/"
+      ],
+      "matchStrings": [
+        "\\|\\s*[\\w.]+\\s*\\|\\s*string\\s*\\|\\s*`\"(?<depName>[a-z0-9][a-z0-9._/-]*):(?<currentValue>[^@\\s\"]+)@(?<currentDigest>sha256:[a-f0-9]{64})\"`"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "The chart's appVersion and the artifacthub.io/images tag follow the app releases (tags v*, image ghcr.io/marcherschel/smb-mount-healer)",
+      "managerFilePatterns": [
+        "/^production/smb-mount-healer/Chart\\.yaml$/"
+      ],
+      "matchStrings": [
+        "\\nappVersion:\\s*\"(?<currentValue>[^\"]+)\"",
+        "image:\\s*ghcr\\.io/marcherschel/smb-mount-healer:(?<currentValue>[^\\s]+)"
+      ],
+      "depNameTemplate": "ghcr.io/marcherschel/smb-mount-healer",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "semver"
+    }
+  ]
+}

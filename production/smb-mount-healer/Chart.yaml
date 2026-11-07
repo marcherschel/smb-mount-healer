@@ -1,0 +1,108 @@
+apiVersion: v2
+type: application
+name: smb-mount-healer
+# The chart is released on its own (tag chart-v<version>,
+# .github/workflows/release-chart.yaml): bump `version` on every chart change
+# (hack/bump-chart-version.sh; CI enforces it via hack/check-chart-version.sh).
+# `appVersion` is the app release (tag v<appVersion>) the chart deploys by
+# default; Renovate bumps it, the artifacthub.io/images tag and the chart
+# version together after each app release.
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.31.0-0"
+description: "Kubernetes operator that detects and heals broken SMB/CIFS CSI mounts (csi-driver-smb): per-node worker probes, leader-elected control plane remediation with dry-run mode, and quarantine of data written to dead mounts."
+home: https://github.com/marcherschel/smb-mount-healer
+sources:
+  - https://github.com/marcherschel/smb-mount-healer
+keywords:
+  - smb
+  - cifs
+  - csi
+  - self-healing
+  - operator
+maintainers:
+  - name: Marc Herschel
+    url: https://github.com/marcherschel
+annotations:
+  artifacthub.io/license: GPL-2.0-only
+  artifacthub.io/prerelease: "true"
+  artifacthub.io/images: |
+    - name: smb-mount-healer
+      image: ghcr.io/marcherschel/smb-mount-healer:0.1.0
+  artifacthub.io/links: |
+    - name: Source
+      url: https://github.com/marcherschel/smb-mount-healer
+    - name: Runbooks
+      url: https://github.com/marcherschel/smb-mount-healer/tree/main/docs/runbooks
+    - name: Design
+      url: https://github.com/marcherschel/smb-mount-healer/blob/main/docs/architecture.md
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial chart (control plane, worker, CRDs, RBAC, metrics, dry-run mode).
+    - kind: added
+      description: Optional Grafana dashboard ConfigMap (monitoring.grafanaDashboard) and PrometheusRule with the alerts (monitoring.prometheusRule).
+  artifacthub.io/crds: |
+    - kind: SmbMount
+      version: v1alpha1
+      name: smbmounts.smbhealer.herschel.io
+      displayName: SMB mount
+      description: Health of one SMB PV on one node (written by the worker), plus remediation stage and last outcome.
+    - kind: SmbMountRemediation
+      version: v1alpha1
+      name: smbmountremediations.smbhealer.herschel.io
+      displayName: SMB mount remediation
+      description: One remediation episode on a node; its status is the remediation state machine.
+    - kind: SmbHostTask
+      version: v1alpha1
+      name: smbhosttasks.smbhealer.herschel.io
+      displayName: SMB host task
+      description: Host actions (force-unmount, quarantine, probe) the control plane asks a node's worker to run.
+    - kind: SmbQuarantine
+      version: v1alpha1
+      name: smbquarantines.smbhealer.herschel.io
+      displayName: SMB quarantine
+      description: One quarantine folder of data written to node-local disk while a mount was dead (counts only, never file names).
+  artifacthub.io/crdsExamples: |
+    - apiVersion: smbhealer.herschel.io/v1alpha1
+      kind: SmbMount
+      metadata:
+        name: node-1.pv-media
+      spec:
+        nodeName: node-1
+        pvName: pv-media
+        share: //nas.example.com/media
+        volumeHandle: nas.example.com/media##
+        globalmountPath: /var/lib/kubelet/plugins/kubernetes.io/csi/smb.csi.k8s.io/0123abcd/globalmount
+    - apiVersion: smbhealer.herschel.io/v1alpha1
+      kind: SmbMountRemediation
+      metadata:
+        name: node-1-1760000000
+      spec:
+        nodeName: node-1
+        type: Workload
+        dryRun: true
+        trigger:
+          smbMounts:
+            - node-1.pv-media
+          reasons:
+            - wrong_fstype
+    - apiVersion: smbhealer.herschel.io/v1alpha1
+      kind: SmbHostTask
+      metadata:
+        name: node-1-1760000000-releasing-mounts-1
+      spec:
+        nodeName: node-1
+        dryRun: true
+        actions:
+          - id: unmount-globalmount
+            type: ForceUnmount
+            path: /var/lib/kubelet/plugins/kubernetes.io/csi/smb.csi.k8s.io/0123abcd/globalmount
+    - apiVersion: smbhealer.herschel.io/v1alpha1
+      kind: SmbQuarantine
+      metadata:
+        name: node-1.pv-media-20251009t085320z
+      spec:
+        nodeName: node-1
+        pvName: pv-media
+        path: /var/lib/kubelet/smb-mount-healer-quarantine/pv-media-20251009T085320Z
+        quarantinedTime: "2025-10-09T08:53:20Z"

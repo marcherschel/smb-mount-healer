@@ -1,0 +1,12 @@
+22 1 252:6 / / rw,relatime shared:1 - xfs /dev/vda6 rw,attr2,inode64,logbufs=8,logbsize=32k,noquota
+23 22 0:21 / /proc rw,nosuid,nodev,noexec,relatime shared:12 - proc proc rw
+24 22 0:5 / /dev rw,nosuid shared:2 - devtmpfs devtmpfs rw,size=4005084k,nr_inodes=1001271,mode=755
+30 22 252:6 /var/lib/kubelet /var/lib/kubelet rw,relatime shared:1 - xfs /dev/vda6 rw,attr2,inode64,logbufs=8,logbsize=32k,noquota
+31 22 252:6 /var/lib/kubelet-other /var/lib/kubelet-other rw,relatime shared:1 - xfs /dev/vda6 rw,attr2,inode64
+40 30 0:55 / /var/lib/kubelet/plugins/kubernetes.io/csi/smb.csi.k8s.io/1e8c0e6f6a1d2b0f1b6e0a2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6/globalmount rw,relatime shared:40 - cifs //u123.your-storagebox.de/backup/library rw,vers=3.1.1,cache=strict,username=u123,uid=0,noforceuid,gid=0,noforcegid,addr=1.2.3.4,file_mode=0777,dir_mode=0777,soft,nounix,serverino,mapposix,rsize=4194304,wsize=4194304,bsize=1048576,echo_interval=60,actimeo=1,closetimeo=1
+41 30 0:55 / /var/lib/kubelet/pods/0b7c1a5e-1111-4a4a-9b9b-222222222222/volumes/kubernetes.io~csi/storagebox-library-data/mount rw,relatime shared:40 - cifs //u123.your-storagebox.de/backup/library rw,vers=3.1.1,cache=strict,soft,nounix,serverino
+50 30 252:6 /var/lib/kubelet/plugins/kubernetes.io/csi/smb.csi.k8s.io/9f2a6b7c8d9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192/globalmount /var/lib/kubelet/pods/d2898609-aaaa-4bbb-8ccc-dddddddddddd/volumes/kubernetes.io~csi/storagebox-transmission-config/mount rw,relatime shared:1 - xfs /dev/vda6 rw,attr2,inode64,logbufs=8,logbsize=32k,noquota
+51 30 252:6 /var/lib/kubelet/plugins/kubernetes.io/csi/smb.csi.k8s.io/5a5a/globalmount /var/lib/kubelet/pods/d2898609-aaaa-4bbb-8ccc-dddddddddddd/volumes/kubernetes.io~csi/storagebox-transmission-downloads/mount rw,relatime shared:1 - xfs /dev/vda6 rw,attr2,inode64,logbufs=8,logbsize=32k,noquota
+60 30 0:56 / /var/lib/kubelet/pods/e1e1e1e1-0000-4000-8000-000000000000/volumes/kubernetes.io~csi/overmounted/mount rw,relatime shared:41 - cifs //srv/overmounted rw,vers=3.1.1,soft
+61 60 252:6 /var/lib/kubelet/plugins/kubernetes.io/csi/smb.csi.k8s.io/7777/globalmount /var/lib/kubelet/pods/e1e1e1e1-0000-4000-8000-000000000000/volumes/kubernetes.io~csi/overmounted/mount rw,relatime shared:1 - xfs /dev/vda6 rw,attr2,inode64
+70 30 0:57 / /var/lib/kubelet/pods/f0f0/volumes/kubernetes.io~empty-dir/with\040space rw,relatime - tmpfs tmpfs rw,size=1024k

@@ -1,0 +1,78 @@
+{"t":"00:02:00","kind":"baseline","msg":"StatefulSet/apps/sts-single=1"}
+{"t":"00:02:10","kind":"inject","msg":"umount -l gm(config-b); write a file into the bare dir; delete sts-single-0"}
+{"t":"00:02:10","kind":"pod","obj":"apps/sts-single-0","msg":"deleting"}
+{"t":"00:02:10","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=dir-with-data pods=[sts-single-0:Unknown]"}
+{"t":"00:02:14","kind":"pod","obj":"apps/sts-single-0","msg":"gone"}
+{"t":"00:02:14","kind":"kubelet","obj":"n1","msg":"unstage config-b failed: remove gm(config-b): directory not empty (attempt 1, retry in 500ms)"}
+{"t":"00:02:14","kind":"smbr","obj":"n1-1791676934","msg":"created type=Sweep smbMounts=[n1.config-b] reasons=[globalmount_not_empty] dryRun=false"}
+{"t":"00:02:14","kind":"stage","obj":"n1-1791676934","to":"planning","reason":"created"}
+{"t":"00:02:14","kind":"cmd","obj":"SmbHostTask/n1-1791676934-planning-0","msg":"create [ProbeNow:gm(config-b)]"}
+{"t":"00:02:14","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=dir-with-data stage=planning"}
+{"t":"00:02:15","kind":"pod","obj":"apps/sts-single-0","msg":"created on n1"}
+{"t":"00:02:15","kind":"kubelet","obj":"n1","msg":"unstage of config-b cancelled: pod apps/sts-single-0 wants the volume (volume stays staged)"}
+{"t":"00:02:15","kind":"kubelet","obj":"n1","msg":"publish config-b into apps/sts-single-0: globalmount not mounted, bound the bare directory (xfs on /dev/vda6)"}
+{"t":"00:02:15","kind":"pod","obj":"apps/sts-single-0","msg":"running on n1"}
+{"t":"00:02:15","kind":"stage","obj":"n1-1791676934","from":"planning","to":"finalizing","reason":"nothing_to_sweep"}
+{"t":"00:02:15","kind":"stage","obj":"n1-1791676934","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:02:15","kind":"outcome","obj":"n1-1791676934","to":"healed","msg":"no orphan finding left after a fresh probe"}
+{"t":"00:02:15","kind":"event","obj":"SmbMountRemediation/n1-1791676934","reason":"Normal/RemediationFinished","msg":"outcome healed: no orphan finding left after a fresh probe","src":"controlplane"}
+{"t":"00:02:15","kind":"smbt","obj":"n1-1791676934-planning-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:02:15","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=dir-with-data pods=[sts-single-0:Unknown] last=healed"}
+{"t":"00:03:15","kind":"smbm","obj":"n1.config-b","msg":"Suspect(wrong_fstype) gm=dir-with-data pods=[sts-single-0:Suspect(wrong_fstype)] last=healed"}
+{"t":"00:03:21","kind":"event","obj":"SmbMount/n1.config-b","reason":"Warning/MountBroken","msg":"pod mount pod(apps/sts-single-0,config-b) of pod apps/sts-single-0 is Broken (wrong_fstype)","src":"worker/n1"}
+{"t":"00:03:21","kind":"smbr","obj":"n1-1791677001","msg":"created type=Workload smbMounts=[n1.config-b] reasons=[wrong_fstype] dryRun=false"}
+{"t":"00:03:21","kind":"stage","obj":"n1-1791677001","to":"pending","reason":"created"}
+{"t":"00:03:21","kind":"stage","obj":"n1-1791677001","from":"pending","to":"planning","reason":"no_scope_conflict"}
+{"t":"00:03:21","kind":"scope","obj":"n1-1791677001","msg":"workloads=[StatefulSet/apps/sts-single(orig=1,in_scope)] pvs=[config-b] drain=[sts-single-0]"}
+{"t":"00:03:21","kind":"cmd","obj":"SmbHostTask/n1-1791677001-planning-0","msg":"create [ProbeNow:gm(config-b)]"}
+{"t":"00:03:21","kind":"smbm","obj":"n1.config-b","msg":"Broken(wrong_fstype) gm=dir-with-data pods=[sts-single-0:Broken(wrong_fstype)] stage=planning last=healed"}
+{"t":"00:03:22","kind":"stage","obj":"n1-1791677001","from":"planning","to":"draining","reason":"probe_completed"}
+{"t":"00:03:22","kind":"cmd","obj":"StatefulSet/apps/sts-single","reason":"scale_down","msg":"scale 1 -> 0"}
+{"t":"00:03:22","kind":"smbt","obj":"n1-1791677001-planning-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:03:22","kind":"smbm","obj":"n1.config-b","msg":"Broken(wrong_fstype) gm=dir-with-data pods=[sts-single-0:Broken(wrong_fstype)] stage=draining last=healed"}
+{"t":"00:03:23","kind":"pod","obj":"apps/sts-single-0","msg":"deleting"}
+{"t":"00:03:23","kind":"scope","obj":"n1-1791677001","msg":"workloads=[StatefulSet/apps/sts-single(orig=1,scaled_down)] pvs=[config-b] drain=[sts-single-0]"}
+{"t":"00:03:23","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=dir-with-data pods=[sts-single-0:Unknown] stage=draining last=healed"}
+{"t":"00:03:27","kind":"pod","obj":"apps/sts-single-0","msg":"gone"}
+{"t":"00:03:27","kind":"kubelet","obj":"n1","msg":"unstage config-b failed: remove gm(config-b): directory not empty (attempt 1, retry in 500ms)"}
+{"t":"00:03:27","kind":"stage","obj":"n1-1791677001","from":"draining","to":"releasing_mounts","reason":"drained"}
+{"t":"00:03:27","kind":"stage","obj":"n1-1791677001","from":"releasing_mounts","to":"awaiting_unstage","reason":"nothing_to_do"}
+{"t":"00:03:27","kind":"stage","obj":"n1-1791677001","from":"awaiting_unstage","to":"quarantining","reason":"nothing_to_do"}
+{"t":"00:03:27","kind":"cmd","obj":"SmbHostTask/n1-1791677001-quarantining-0","msg":"create [Quarantine:gm(config-b)?NotMountpoint]"}
+{"t":"00:03:27","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=dir-with-data stage=quarantining last=healed"}
+{"t":"00:03:28","kind":"kubelet","obj":"n1","msg":"unstage config-b failed: remove gm(config-b): directory not empty (attempt 2, retry in 1s)"}
+{"t":"00:03:28","kind":"event","obj":"SmbQuarantine/n1.config-b-20261011t000328z","reason":"Warning/ShadowDataQuarantined","msg":"quarantine folder q/config-b-20261011T000328Z holds 2 file(s), 128 byte(s) of shadow data of PV config-b; move the data off the node to resolve","src":"worker/n1"}
+{"t":"00:03:28","kind":"stage","obj":"n1-1791677001","from":"quarantining","to":"awaiting_unstage_completion","reason":"host_task_completed"}
+{"t":"00:03:28","kind":"smbt","obj":"n1-1791677001-quarantining-0","to":"Succeeded","msg":"[quarantine-000=Succeeded->q/config-b-20261011T000328Z(2 entries)]"}
+{"t":"00:03:28","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=empty-dir stage=awaiting_unstage_completion last=healed"}
+{"t":"00:03:28","kind":"smbq","obj":"n1.config-b-20261011t000328z","msg":"created pv=config-b files=2 entries=2 bytes=128 source=gm(config-b) remediationRef=\"n1-1791677001\""}
+{"t":"00:03:29","kind":"kubelet","obj":"n1","msg":"unstage config-b: ok (attempt 3), globalmount dir removed"}
+{"t":"00:03:29","kind":"stage","obj":"n1-1791677001","from":"awaiting_unstage_completion","to":"restarting_driver","reason":"unstage_completed"}
+{"t":"00:03:29","kind":"cmd","obj":"Pod/kube-system/csi-smb-node-n1-1","reason":"driver_restart","msg":"delete"}
+{"t":"00:03:29","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=absent quarantines=1 stage=restarting_driver last=healed"}
+{"t":"00:03:32","kind":"driver","obj":"csi-smb-node-n1-2","msg":"created"}
+{"t":"00:03:37","kind":"driver","obj":"csi-smb-node-n1-2","msg":"ready"}
+{"t":"00:03:37","kind":"stage","obj":"n1-1791677001","from":"restarting_driver","to":"scaling_up","reason":"driver_ready"}
+{"t":"00:03:37","kind":"cmd","obj":"StatefulSet/apps/sts-single","reason":"scale_up","msg":"scale 0 -> 1"}
+{"t":"00:03:37","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=absent quarantines=1 stage=scaling_up last=healed"}
+{"t":"00:03:38","kind":"pod","obj":"apps/sts-single-0","msg":"created on n1"}
+{"t":"00:03:38","kind":"kubelet","obj":"n1","msg":"stage config-b: mounted cifs //samba.e2e.svc.cluster.local/config-b"}
+{"t":"00:03:38","kind":"kubelet","obj":"n1","msg":"publish config-b into apps/sts-single-0: bind of the globalmount (cifs)"}
+{"t":"00:03:38","kind":"pod","obj":"apps/sts-single-0","msg":"running on n1"}
+{"t":"00:03:38","kind":"stage","obj":"n1-1791677001","from":"scaling_up","to":"verifying","reason":"scaled_up"}
+{"t":"00:03:38","kind":"scope","obj":"n1-1791677001","msg":"workloads=[StatefulSet/apps/sts-single(orig=1,restored)] pvs=[config-b] drain=[sts-single-0]"}
+{"t":"00:03:38","kind":"verify","obj":"n1-1791677001","msg":"StatefulSet/apps/sts-single=pending"}
+{"t":"00:03:38","kind":"cmd","obj":"SmbHostTask/n1-1791677001-verifying-0","msg":"create [ProbeNow:gm(config-b)]"}
+{"t":"00:03:38","kind":"cmd","obj":"SmbHostTask/n1-1791677001-verifying-1","msg":"create [ProbeNow:pod(apps/sts-single-0,config-b)]"}
+{"t":"00:03:38","kind":"smbm","obj":"n1.config-b","msg":"Healthy gm=cifs pods=[sts-single-0:Unknown] quarantines=1 stage=verifying last=healed"}
+{"t":"00:03:39","kind":"smbt","obj":"n1-1791677001-verifying-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:03:39","kind":"smbt","obj":"n1-1791677001-verifying-1","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:04:38","kind":"stage","obj":"n1-1791677001","from":"verifying","to":"finalizing","reason":"verified"}
+{"t":"00:04:38","kind":"stage","obj":"n1-1791677001","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:04:38","kind":"verify","obj":"n1-1791677001","msg":"StatefulSet/apps/sts-single=verified"}
+{"t":"00:04:38","kind":"outcome","obj":"n1-1791677001","to":"healed","msg":"remediation finished: 1 workload(s), 1 PV(s)"}
+{"t":"00:04:38","kind":"event","obj":"SmbMountRemediation/n1-1791677001","reason":"Normal/RemediationFinished","msg":"outcome healed: remediation finished: 1 workload(s), 1 PV(s)","src":"controlplane"}
+{"t":"00:04:38","kind":"smbm","obj":"n1.config-b","msg":"Healthy gm=cifs pods=[sts-single-0:Healthy] quarantines=1 last=healed"}
+{"t":"00:06:38","kind":"result","msg":"outcomes=[Sweep:healed Workload:healed] healed=true"}
+{"t":"00:06:38","kind":"replicas","msg":"StatefulSet/apps/sts-single=1/1"}
+{"t":"00:06:38","kind":"metrics","msg":"host_actions_total{action=probe_now,dry_run=false,node=n1,result=succeeded}=4 host_actions_total{action=quarantine,dry_run=false,node=n1,result=succeeded}=1 probes_hung{node=n1}=0 quarantines{node=n1,pv=config-b}=1 remediations_started_total{mode=live,target_node=n1,type=Sweep}=1 remediations_started_total{mode=live,target_node=n1,type=Workload}=1 remediations_total{mode=live,outcome=healed,target_node=n1,type=Sweep}=1 remediations_total{mode=live,outcome=healed,target_node=n1,type=Workload}=1 workload_actions_total{action=driver_restart,mode=live,result=success}=1 workload_actions_total{action=scale_down,mode=live,result=success}=1 workload_actions_total{action=scale_up,mode=live,result=success}=1 workload_verifications_total{result=verified}=1"}

@@ -1,0 +1,511 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "smb-mount-healer chart values",
+  "definitions": {
+    "duration": {
+      "type": "string",
+      "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+      "description": "Go duration, e.g. 90s, 5m, 1h30m."
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^(sha256:[a-f0-9]{64})?$"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "crds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "install": {
+          "type": "boolean"
+        },
+        "keep": {
+          "type": "boolean"
+        }
+      }
+    },
+    "dryRun": {
+      "type": "boolean"
+    },
+    "csi": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "driverName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodeDriver": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "namespace": {
+              "type": "string",
+              "minLength": 1
+            },
+            "labelSelector": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "kubeletRoot": {
+      "type": "string",
+      "pattern": "^/.+"
+    },
+    "quarantineDir": {
+      "type": "string",
+      "pattern": "^(/.+)?$"
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "error",
+            "panic"
+          ]
+        },
+        "encoder": {
+          "type": "string",
+          "enum": [
+            "json",
+            "console"
+          ]
+        }
+      }
+    },
+    "controlplane": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "leaderElection": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remediation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scaleDownWait": {
+              "$ref": "#/definitions/duration"
+            },
+            "unstageWait": {
+              "$ref": "#/definitions/duration"
+            },
+            "quarantineUnstageWait": {
+              "$ref": "#/definitions/duration"
+            },
+            "driverRestartWait": {
+              "$ref": "#/definitions/duration"
+            },
+            "verifyWait": {
+              "$ref": "#/definitions/duration"
+            },
+            "verifyNoPodGrace": {
+              "$ref": "#/definitions/duration"
+            },
+            "episodeMaxDuration": {
+              "$ref": "#/definitions/duration"
+            },
+            "backoffBase": {
+              "$ref": "#/definitions/duration"
+            },
+            "backoffMax": {
+              "$ref": "#/definitions/duration"
+            },
+            "pollInterval": {
+              "$ref": "#/definitions/duration"
+            },
+            "planningProbeWait": {
+              "$ref": "#/definitions/duration"
+            },
+            "retention": {
+              "$ref": "#/definitions/duration"
+            },
+            "retainMinPerNode": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1048576
+            }
+          }
+        },
+        "podSecurityContext": {
+          "type": "object",
+          "description": "Kubernetes object passed through as-is."
+        },
+        "securityContext": {
+          "type": "object",
+          "description": "Kubernetes object passed through as-is."
+        },
+        "extraEnv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "description": "Kubernetes object passed through as-is."
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Kubernetes list passed through as-is."
+        },
+        "affinity": {
+          "type": "object",
+          "description": "Kubernetes object passed through as-is."
+        },
+        "priorityClassName": {
+          "type": "string"
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "podLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "probing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "checkInterval": {
+              "$ref": "#/definitions/duration"
+            },
+            "recheckAttempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "recheckDelay": {
+              "$ref": "#/definitions/duration"
+            },
+            "statTimeout": {
+              "$ref": "#/definitions/duration"
+            },
+            "slowConfirmWindow": {
+              "$ref": "#/definitions/duration"
+            },
+            "podStartupGrace": {
+              "$ref": "#/definitions/duration"
+            },
+            "startupGrace": {
+              "$ref": "#/definitions/duration"
+            },
+            "probeConcurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "expectedFsTypes": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "statusHeartbeat": {
+              "$ref": "#/definitions/duration"
+            }
+          }
+        },
+        "quarantineScan": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "interval": {
+              "$ref": "#/definitions/duration"
+            },
+            "maxEntries": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1099511627776
+            },
+            "timeBudget": {
+              "$ref": "#/definitions/duration"
+            }
+          }
+        },
+        "updateStrategy": {
+          "type": "object",
+          "description": "Kubernetes object passed through as-is."
+        },
+        "extraEnv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "description": "Kubernetes object passed through as-is."
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Kubernetes list passed through as-is."
+        },
+        "affinity": {
+          "type": "object",
+          "description": "Kubernetes object passed through as-is."
+        },
+        "priorityClassName": {
+          "type": "string"
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "podLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "podMonitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "interval": {
+              "$ref": "#/definitions/duration"
+            },
+            "labels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "honorLabels": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "grafanaDashboard": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "labels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "prometheusRule": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "labels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "additionalRuleLabels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "runbookBaseUrl": {
+              "type": "string",
+              "pattern": "^(https?://.+)?$"
+            },
+            "disabledAlerts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "global": {
+      "type": "object"
+    }
+  }
+}

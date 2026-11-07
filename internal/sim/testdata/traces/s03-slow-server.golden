@@ -1,0 +1,11 @@
+{"t":"00:02:00","kind":"baseline","msg":"Deployment/apps/deploy-single=1"}
+{"t":"00:02:10","kind":"inject","msg":"pkill -STOP smbd (20s, shorter than SLOW_CONFIRM_WINDOW)"}
+{"t":"00:02:10","kind":"samba","obj":"samba.e2e.svc.cluster.local","from":"up","to":"paused"}
+{"t":"00:02:14","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:02:20","kind":"smbm","obj":"n1.config-a","msg":"Suspect(probe_hung) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(probe_hung)]"}
+{"t":"00:02:30","kind":"inject","msg":"pkill -CONT smbd"}
+{"t":"00:02:30","kind":"samba","obj":"samba.e2e.svc.cluster.local","from":"paused","to":"up"}
+{"t":"00:02:32","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:08:00","kind":"result","msg":"outcomes=[] healed=true"}
+{"t":"00:08:00","kind":"replicas","msg":"Deployment/apps/deploy-single=1/1"}
+{"t":"00:08:00","kind":"metrics","msg":"false_alarms_total{kind=globalmount,node=n1,reason=probe_hung}=1 false_alarms_total{kind=pod,node=n1,reason=probe_hung}=1 probes_hung{node=n1}=0"}

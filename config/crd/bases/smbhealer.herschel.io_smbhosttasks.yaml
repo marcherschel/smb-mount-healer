@@ -1,0 +1,181 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: smbhosttasks.smbhealer.herschel.io
+spec:
+  group: smbhealer.herschel.io
+  names:
+    categories:
+    - smbhealer
+    kind: SmbHostTask
+    listKind: SmbHostTaskList
+    plural: smbhosttasks
+    shortNames:
+    - smbt
+    singular: smbhosttask
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.nodeName
+      name: Node
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.dryRun
+      name: Dry-Run
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SmbHostTask tells one worker which host actions to run.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SmbHostTaskSpec is immutable after creation.
+            properties:
+              actions:
+                items:
+                  description: HostAction is one idempotent action for the worker
+                    on spec.nodeName.
+                  properties:
+                    id:
+                      description: ID is unique within the task; a result with this
+                        ID means "already done".
+                      maxLength: 63
+                      minLength: 1
+                      type: string
+                    onlyIf:
+                      description: OnlyIf is re-checked against live mountinfo right
+                        before acting.
+                      enum:
+                      - NotHealthyMount
+                      - NotMountpoint
+                      type: string
+                    path:
+                      description: Path is an absolute host path under the kubelet
+                        root.
+                      pattern: ^/
+                      type: string
+                    pv:
+                      description: PV is required for Quarantine (it names the quarantine
+                        folder).
+                      type: string
+                    type:
+                      description: HostActionType is an action a worker performs on
+                        its node.
+                      enum:
+                      - ForceUnmount
+                      - Quarantine
+                      - ProbeNow
+                      type: string
+                  required:
+                  - id
+                  - path
+                  - type
+                  type: object
+                maxItems: 256
+                minItems: 1
+                type: array
+                x-kubernetes-list-map-keys:
+                - id
+                x-kubernetes-list-type: map
+              dryRun:
+                description: DryRun makes the worker only log what it would do.
+                type: boolean
+              nodeName:
+                minLength: 1
+                type: string
+            required:
+            - actions
+            - nodeName
+            type: object
+            x-kubernetes-validations:
+            - message: spec is immutable
+              rule: self == oldSelf
+          status:
+            description: SmbHostTaskStatus is written by the worker only.
+            properties:
+              observedGeneration:
+                format: int64
+                type: integer
+              phase:
+                description: HostTaskPhase is the overall phase of an SmbHostTask.
+                enum:
+                - Pending
+                - Running
+                - Succeeded
+                - Failed
+                type: string
+              results:
+                items:
+                  description: HostActionResult is the worker's result for one action.
+                  properties:
+                    destination:
+                      description: Destination is the quarantine folder (the healer's
+                        own path) for Quarantine actions.
+                      type: string
+                    entries:
+                      description: Entries is the number of top-level entries moved
+                        by Quarantine.
+                      format: int32
+                      type: integer
+                    error:
+                      description: Error is a short error text. It MUST NOT contain
+                        entry names from user data.
+                      maxLength: 1024
+                      type: string
+                    id:
+                      minLength: 1
+                      type: string
+                    result:
+                      description: HostActionOutcome is the result of one host action.
+                      enum:
+                      - InProgress
+                      - Succeeded
+                      - Skipped
+                      - DryRun
+                      - Failed
+                      type: string
+                    time:
+                      format: date-time
+                      type: string
+                  required:
+                  - id
+                  - result
+                  - time
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - id
+                x-kubernetes-list-type: map
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

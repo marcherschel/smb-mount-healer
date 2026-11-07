@@ -1,0 +1,16 @@
+{"t":"00:02:00","kind":"baseline","msg":"StatefulSet/apps/sts-single=1"}
+{"t":"00:02:10","kind":"inject","msg":"umount -l gm(config-b); delete a pod of sts-single"}
+{"t":"00:02:10","kind":"pod","obj":"apps/sts-single-0","msg":"deleting"}
+{"t":"00:02:10","kind":"smbm","obj":"n1.config-b","msg":"Unknown gm=empty-dir pods=[sts-single-0:Unknown]"}
+{"t":"00:02:14","kind":"pod","obj":"apps/sts-single-0","msg":"gone"}
+{"t":"00:02:14","kind":"kubelet","obj":"n1","msg":"unstage config-b: ok (attempt 1), globalmount dir removed"}
+{"t":"00:02:14","kind":"smbm","obj":"n1.config-b","msg":"deleted"}
+{"t":"00:02:15","kind":"pod","obj":"apps/sts-single-0","msg":"created on n1"}
+{"t":"00:02:15","kind":"kubelet","obj":"n1","msg":"stage config-b: mounted cifs //samba.e2e.svc.cluster.local/config-b"}
+{"t":"00:02:15","kind":"kubelet","obj":"n1","msg":"publish config-b into apps/sts-single-0: bind of the globalmount (cifs)"}
+{"t":"00:02:15","kind":"pod","obj":"apps/sts-single-0","msg":"running on n1"}
+{"t":"00:02:15","kind":"smbm","obj":"n1.config-b","msg":"Healthy gm=cifs pods=[sts-single-0:Unknown]"}
+{"t":"00:03:15","kind":"smbm","obj":"n1.config-b","msg":"Healthy gm=cifs pods=[sts-single-0:Healthy]"}
+{"t":"00:06:00","kind":"result","msg":"outcomes=[] healed=true"}
+{"t":"00:06:00","kind":"replicas","msg":"StatefulSet/apps/sts-single=1/1"}
+{"t":"00:06:00","kind":"metrics","msg":"probes_hung{node=n1}=0"}

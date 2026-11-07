@@ -1,0 +1,5 @@
+/bin/
+/dist/
+/cover.out
+/test/e2e/_runs/
+/smb-mount-healer

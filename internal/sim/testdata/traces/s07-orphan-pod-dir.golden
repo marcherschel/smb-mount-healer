@@ -1,0 +1,26 @@
+{"t":"00:02:00","kind":"baseline","msg":"Deployment/apps/deploy-single=1"}
+{"t":"00:02:10","kind":"inject","msg":"seed pods/<rand-uid>/volumes/kubernetes.io~csi/spare/mount/old.txt"}
+{"t":"00:02:10","kind":"smbr","obj":"n1-1791676930","msg":"created type=Sweep smbMounts=[n1.spare] reasons=[orphan_pod_dir_not_empty] dryRun=false"}
+{"t":"00:02:10","kind":"stage","obj":"n1-1791676930","to":"planning","reason":"created"}
+{"t":"00:02:10","kind":"cmd","obj":"SmbHostTask/n1-1791676930-planning-0","msg":"create [ProbeNow:gm(config-a) ProbeNow:gm(spare)]"}
+{"t":"00:02:10","kind":"smbm","obj":"n1.spare","msg":"Unknown gm=absent orphans=1(dirty=1) stage=planning"}
+{"t":"00:02:11","kind":"stage","obj":"n1-1791676930","from":"planning","to":"sweeping","reason":"probe_completed"}
+{"t":"00:02:11","kind":"scope","obj":"n1-1791676930","msg":"workloads=[] pvs=[spare] drain=[]"}
+{"t":"00:02:11","kind":"cmd","obj":"SmbHostTask/n1-1791676930-sweeping-0","msg":"create [Quarantine:pod(orphan-0b5e0d0c-dead-4bad-8bad-0123456789ab,spare)?NotMountpoint]"}
+{"t":"00:02:11","kind":"smbt","obj":"n1-1791676930-planning-0","to":"Succeeded","msg":"[probe-000=Succeeded probe-001=Succeeded]"}
+{"t":"00:02:11","kind":"smbm","obj":"n1.spare","msg":"Unknown gm=absent orphans=1(dirty=1) stage=sweeping"}
+{"t":"00:02:12","kind":"event","obj":"SmbQuarantine/n1.spare-20261011t000212z","reason":"Warning/ShadowDataQuarantined","msg":"quarantine folder q/spare-20261011T000212Z holds 1 file(s), 64 byte(s) of shadow data of PV spare; move the data off the node to resolve","src":"worker/n1"}
+{"t":"00:02:12","kind":"stage","obj":"n1-1791676930","from":"sweeping","to":"awaiting_unstage_completion","reason":"host_task_completed"}
+{"t":"00:02:12","kind":"stage","obj":"n1-1791676930","from":"awaiting_unstage_completion","to":"finalizing","reason":"unstage_completed"}
+{"t":"00:02:12","kind":"stage","obj":"n1-1791676930","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:02:12","kind":"outcome","obj":"n1-1791676930","to":"healed","msg":"remediation finished: 0 workload(s), 1 PV(s)"}
+{"t":"00:02:12","kind":"event","obj":"SmbMountRemediation/n1-1791676930","reason":"Normal/RemediationFinished","msg":"outcome healed: remediation finished: 0 workload(s), 1 PV(s)","src":"controlplane"}
+{"t":"00:02:12","kind":"smbt","obj":"n1-1791676930-sweeping-0","to":"Succeeded","msg":"[quarantine-000=Succeeded->q/spare-20261011T000212Z(1 entries)]"}
+{"t":"00:02:12","kind":"smbm","obj":"n1.spare","msg":"Unknown gm=absent orphans=1(dirty=0) last=healed"}
+{"t":"00:02:12","kind":"smbq","obj":"n1.spare-20261011t000212z","msg":"created pv=spare files=1 entries=1 bytes=64 source=pod(orphan-0b5e0d0c-dead-4bad-8bad-0123456789ab,spare) remediationRef=\"n1-1791676930\""}
+{"t":"00:02:13","kind":"smbm","obj":"n1.spare","msg":"Unknown gm=absent orphans=1(dirty=0) quarantines=1 last=healed"}
+{"t":"00:02:21","kind":"kubelet","obj":"n1","msg":"removed orphaned pod volume dir pod(orphan-0b5e0d0c-dead-4bad-8bad-0123456789ab,spare)"}
+{"t":"00:02:21","kind":"smbm","obj":"n1.spare","msg":"deleted"}
+{"t":"00:04:12","kind":"result","msg":"outcomes=[Sweep:healed] healed=true"}
+{"t":"00:04:12","kind":"replicas","msg":"Deployment/apps/deploy-single=1/1"}
+{"t":"00:04:12","kind":"metrics","msg":"host_actions_total{action=probe_now,dry_run=false,node=n1,result=succeeded}=2 host_actions_total{action=quarantine,dry_run=false,node=n1,result=succeeded}=1 probes_hung{node=n1}=0 quarantines{node=n1,pv=spare}=1 remediations_started_total{mode=live,target_node=n1,type=Sweep}=1 remediations_total{mode=live,outcome=healed,target_node=n1,type=Sweep}=1"}

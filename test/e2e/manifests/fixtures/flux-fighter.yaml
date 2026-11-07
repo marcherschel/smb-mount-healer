@@ -1,0 +1,127 @@
+# flux-fighter (S10): stands in for Flux re-applying `replicas` while the
+# healer is draining. Disabled by default; the suite toggles it through the
+# ConfigMap (framework Fixtures.EnableFighter / DisableFighter), which the
+# loop re-reads from the API every interval (no kubelet ConfigMap sync lag).
+# Runs on the server node so it never shares a node with the volumes under test.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flux-fighter
+  namespace: smbmh-fixtures
+data:
+  enabled: "false"
+  # kubectl resource/name in smbmh-fixtures
+  target: deployment/cotenant-a
+  replicas: "1"
+  interval: "2"
+  fight.sh: |
+    #!/bin/sh
+    # Every $interval seconds: if enabled, scale $target back to $replicas
+    # whenever it differs (like a Flux reconcile of spec.replicas).
+    set -u
+    get() { kubectl -n "$NS" get configmap flux-fighter -o "jsonpath={.data.$1}" 2>/dev/null; }
+    while true; do
+      if [ "$(get enabled)" = "true" ]; then
+        target=$(get target); want=$(get replicas)
+        cur=$(kubectl -n "$NS" get "$target" -o 'jsonpath={.spec.replicas}' 2>/dev/null || true)
+        if [ -n "$cur" ] && [ "$cur" != "$want" ]; then
+          echo "$(date -u +%FT%TZ) fight: $target replicas $cur -> $want"
+          kubectl -n "$NS" scale "$target" --replicas="$want" || true
+        fi
+      fi
+      interval=$(get interval)
+      sleep "${interval:-2}"
+    done
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-fighter
+  namespace: smbmh-fixtures
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: flux-fighter
+  namespace: smbmh-fixtures
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["flux-fighter"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: flux-fighter
+  namespace: smbmh-fixtures
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flux-fighter
+subjects:
+  - kind: ServiceAccount
+    name: flux-fighter
+    namespace: smbmh-fixtures
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flux-fighter
+  namespace: smbmh-fixtures
+  labels:
+    app.kubernetes.io/name: flux-fighter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: flux-fighter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: flux-fighter
+    spec:
+      serviceAccountName: flux-fighter
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      tolerations:
+        - operator: Exists
+      terminationGracePeriodSeconds: 2
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: fighter
+          # alpine/kubectl: alpine + kubectl (registry.k8s.io/kubectl is
+          # distroless and has no shell for the loop).
+          image: alpine/kubectl:1.37.1@sha256:b568e8beb6a79aee269c142343078a278b85e7710f1c0e7d8d6b21d1eb566a48
+          command: ["/bin/sh", "/fighter/fight.sh"]
+          env:
+            - name: HOME
+              value: /tmp
+            - name: NS
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: script
+              mountPath: /fighter
+      volumes:
+        - name: script
+          configMap:
+            name: flux-fighter
+            items:
+              - key: fight.sh
+                path: fight.sh

@@ -1,0 +1,252 @@
+# Default values for smb-mount-healer.
+#
+# The defaults of controlplane.remediation, worker.probing and
+# worker.quarantineScan equal the binary's built-in defaults (internal/config);
+# production/defaults_test.go fails if the two drift apart.
+
+image:
+  # -- Image repository (one image runs both the control plane and the worker).
+  repository: ghcr.io/marcherschel/smb-mount-healer
+  # -- Image tag. Defaults to the chart's `appVersion`.
+  tag: ""
+  # -- Image digest (`sha256:...`), appended as `@digest`.
+  digest: ""
+  # -- Full image reference (`repo:tag@digest`). Wins over `repository`, `tag` and `digest`.
+  reference: ""
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets for both components, e.g. `[{name: regcred}]`.
+imagePullSecrets: []
+# -- Overrides the chart name in resource names and the `app.kubernetes.io/name` label.
+nameOverride: ""
+# -- Overrides the full resource name prefix (default: release name, or `<release>-smb-mount-healer`).
+fullnameOverride: ""
+
+crds:
+  # -- Install the four CRDs (`smbm`, `smbr`, `smbt`, `smbq`) with the chart.
+  # They are templates (not `crds/`), so `helm upgrade` updates them.
+  install: true
+  # -- Annotate the CRDs with `helm.sh/resource-policy: keep`, so `helm uninstall`
+  # never deletes them (and with them all remediation history and quarantine records).
+  keep: true
+
+# -- Dry-run mode. When true, the control plane runs with `--dry-run`: remediations
+# walk every stage and end with outcome `dry_run`, host tasks are created with
+# `dryRun: true` and only report what they would do; nothing is scaled, deleted,
+# unmounted or quarantined. Use it to observe the healer before letting it act.
+dryRun: false
+
+csi:
+  # -- CSI driver name of the SMB PVs to watch (`CSI_DRIVER_NAME`).
+  driverName: smb.csi.k8s.io
+  nodeDriver:
+    # -- Namespace of the CSI node driver DaemonSet the control plane restarts (`CSI_NODE_DRIVER_NAMESPACE`).
+    namespace: kube-system
+    # -- Label selector of the CSI node driver pods (`CSI_NODE_DRIVER_LABEL_SELECTOR`).
+    labelSelector: app=csi-smb-node
+
+# -- Kubelet root directory on the nodes (`KUBELET_ROOT`). Also the worker's
+# hostPath and mountPath (mounted with `mountPropagation: Bidirectional`).
+kubeletRoot: /var/lib/kubelet
+# -- Quarantine directory on the nodes (`QUARANTINE_DIR`). Empty means
+# `<kubeletRoot>/smb-mount-healer-quarantine`. Must be under `kubeletRoot`.
+quarantineDir: ""
+
+logging:
+  # -- Log level (`--zap-log-level`).
+  level: info
+  # -- Log encoder (`--zap-encoder`).
+  encoder: json
+
+controlplane:
+  leaderElection:
+    # -- Leader election (`--leader-elect`). A Lease `<fullname>-controlplane` in the release namespace.
+    enabled: true
+  # -- Control-plane replicas. More than 1 only makes sense with leader election
+  # (one active decision maker, the others stand by).
+  replicas: 1
+  # Remediation timing, passed as environment variables. Durations are Go
+  # durations (e.g. `90s`, `5m`).
+  remediation:
+    # -- `SCALE_DOWN_WAIT`: how long to wait for workload pods to terminate after scaling down.
+    scaleDownWait: 120s
+    # -- `UNSTAGE_WAIT`: how long to wait for the CSI driver to unstage the globalmount.
+    unstageWait: 30s
+    # -- `QUARANTINE_UNSTAGE_WAIT`: unstage wait when the mount point holds local data that must be quarantined.
+    quarantineUnstageWait: 300s
+    # -- `DRIVER_RESTART_WAIT`: how long to wait for the restarted CSI node driver pod to become ready.
+    driverRestartWait: 90s
+    # -- `VERIFY_WAIT`: how long to wait for the scaled-up workload to be healthy again.
+    verifyWait: 90s
+    # -- `VERIFY_NO_POD_GRACE`: grace period before a workload without pods counts as verified.
+    verifyNoPodGrace: 30s
+    # -- `EPISODE_MAX_DURATION`: an episode running longer is rolled back.
+    episodeMaxDuration: 30m
+    # -- `BACKOFF_BASE`: base of the exponential backoff between episodes for the same mount.
+    backoffBase: 5m
+    # -- `BACKOFF_MAX`: maximum backoff between episodes.
+    backoffMax: 1h
+    # -- `POLL_INTERVAL`: requeue interval while a stage waits.
+    pollInterval: 3s
+    # -- `PLANNING_PROBE_WAIT`: how long the planning stage waits for fresh worker probes.
+    planningProbeWait: 15s
+    # -- `REMEDIATION_RETENTION`: finished `SmbMountRemediation`s older than this are deleted.
+    retention: 24h
+    # -- `REMEDIATION_RETAIN_MIN_PER_NODE`: finished remediations always kept per node, regardless of age.
+    retainMinPerNode: 10
+  # -- Extra environment variables for the control-plane container.
+  extraEnv: []
+  # -- Control-plane container resources.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  # -- Control-plane pod security context.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  # -- Control-plane container security context.
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  # -- Control-plane node selector.
+  nodeSelector: {}
+  # -- Control-plane tolerations.
+  tolerations: []
+  # -- Control-plane affinity.
+  affinity: {}
+  # -- Control-plane priority class. None by default: it is stateless and resumes from CR status after a reschedule.
+  priorityClassName: ""
+  # -- Extra control-plane pod annotations.
+  podAnnotations: {}
+  # -- Extra control-plane pod labels.
+  podLabels: {}
+
+worker:
+  # Mount probing, passed as environment variables.
+  probing:
+    # -- `CHECK_INTERVAL`: interval between probe rounds on a node.
+    checkInterval: 60s
+    # -- `RECHECK_ATTEMPTS`: consecutive failed probes before a mount is Broken.
+    recheckAttempts: 3
+    # -- `RECHECK_DELAY`: delay between rechecks of a failing mount.
+    recheckDelay: 3s
+    # -- `STAT_TIMEOUT`: a stat slower than this counts as hung. Must be shorter than `checkInterval`.
+    statTimeout: 5s
+    # -- `SLOW_CONFIRM_WINDOW`: slow failures (`stat_timeout`, `probe_hung`) must last this long before a mount is Broken.
+    slowConfirmWindow: 3m
+    # -- `POD_STARTUP_GRACE`: mounts of pods younger than this are not judged.
+    podStartupGrace: 60s
+    # -- `STARTUP_GRACE`: delay after worker start before the first probe round.
+    startupGrace: 10s
+    # -- `PROBE_CONCURRENCY`: parallel probes per node.
+    probeConcurrency: 4
+    # -- `EXPECTED_FSTYPES`: space-separated filesystem types a healthy mount may have.
+    expectedFsTypes: "cifs smb3"
+    # -- `STATUS_HEARTBEAT`: `SmbMount` status is rewritten at least this often even without changes.
+    statusHeartbeat: 5m
+  # Quarantine folder scanning (reports counts and bytes in `SmbQuarantine`s).
+  quarantineScan:
+    # -- `QUARANTINE_SCAN_INTERVAL`: interval between quarantine scans.
+    interval: 5m
+    # -- `QUARANTINE_SCAN_MAX_ENTRIES`: entries counted per folder before the size is reported as truncated.
+    maxEntries: 100000
+    # -- `QUARANTINE_SCAN_TIME_BUDGET`: time budget per folder scan.
+    timeBudget: 10s
+  # -- Extra environment variables for the worker container.
+  extraEnv: []
+  # -- Worker container resources.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 192Mi
+  # -- Worker priority class. The worker repairs storage under exactly the node
+  # pressure stalled CIFS I/O causes, and holds no PVs, so it must not be evicted.
+  priorityClassName: system-node-critical
+  # -- Worker tolerations. Default: every node, wherever SMB volumes can be mounted.
+  tolerations:
+    - operator: Exists
+  # -- Worker node selector.
+  nodeSelector: {}
+  # -- Worker affinity.
+  affinity: {}
+  # -- Worker DaemonSet update strategy.
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  # -- Extra worker pod annotations.
+  podAnnotations: {}
+  # -- Extra worker pod labels.
+  podLabels: {}
+
+serviceAccount:
+  # -- Create the ServiceAccounts `<fullname>-controlplane` and `<fullname>-worker`.
+  # If false, they must exist (the ClusterRoleBindings still reference them).
+  create: true
+  # -- Annotations for both ServiceAccounts.
+  annotations: {}
+
+metrics:
+  service:
+    # -- Create the metrics Services `<fullname>-controlplane-metrics` (ClusterIP) and
+    # `<fullname>-worker-metrics` (headless), port `http-metrics` 8080. Required by `helm test`.
+    enabled: true
+  podMonitor:
+    # -- Create one PodMonitor (`monitoring.coreos.com/v1`) per component. Fails if the CRD is missing.
+    enabled: false
+    # -- Scrape interval.
+    interval: 60s
+    # -- Extra PodMonitor labels, e.g. to match a Prometheus `podMonitorSelector`.
+    labels: {}
+    # -- Keep the labels of scraped series on conflict with target labels.
+    honorLabels: false
+
+monitoring:
+  grafanaDashboard:
+    # -- Create a ConfigMap with the Grafana dashboard (`monitoring/dashboards/smb-mount-healer.json`)
+    # for the Grafana dashboard sidecar (kube-prometheus-stack, grafana chart).
+    enabled: false
+    # -- Namespace of the ConfigMap. Defaults to the release namespace; set it if
+    # your sidecar only watches Grafana's namespace.
+    namespace: ""
+    # -- Labels of the ConfigMap; must match the sidecar's label selector
+    # (`sidecar.dashboards.label`/`labelValue` in the grafana chart).
+    labels:
+      grafana_dashboard: "1"
+    # -- Annotations of the ConfigMap, e.g. `grafana_folder: Storage` or
+    # `k8s-sidecar-target-directory: /tmp/dashboards/storage` (sidecar folder support).
+    annotations: {}
+  prometheusRule:
+    # -- Create a PrometheusRule (`monitoring.coreos.com/v1`) with the alerts from
+    # `monitoring/alerts/smb-mount-healer.rules.yaml`. Fails if the CRD is missing.
+    enabled: false
+    # -- Namespace of the PrometheusRule. Defaults to the release namespace.
+    namespace: ""
+    # -- Extra PrometheusRule labels, e.g. to match the Prometheus `ruleSelector`
+    # (`release: kube-prometheus-stack`).
+    labels: {}
+    # -- Labels added to every alert, e.g. `team: storage`. A rule's own labels
+    # (such as `severity`) win on conflict.
+    additionalRuleLabels: {}
+    # -- Base URL of the runbooks; each alert gets `runbook_url: <base>/<alert>.md`.
+    # Empty keeps the URLs from the rule file.
+    runbookBaseUrl: https://github.com/marcherschel/smb-mount-healer/blob/main/docs/runbooks
+    # -- Alert names to leave out, e.g. `[SmbMountHealerShadowDataPending]`. Unknown names fail the render.
+    disabledAlerts: []
+
+tests:
+  # renovate: datasource=docker depName=busybox
+  # -- Image of the `helm test` pod (needs `wget` and `grep`).
+  image: busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4

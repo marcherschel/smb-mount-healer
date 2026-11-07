@@ -1,0 +1,13 @@
+# PodMonitors, Grafana dashboard and PrometheusRule (render with
+# --api-versions monitoring.coreos.com/v1/PodMonitor and .../PrometheusRule).
+metrics:
+  podMonitor:
+    enabled: true
+    interval: 30s
+    labels:
+      release: kube-prometheus-stack
+monitoring:
+  grafanaDashboard:
+    enabled: true
+  prometheusRule:
+    enabled: true

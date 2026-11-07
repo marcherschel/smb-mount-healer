@@ -1,0 +1,61 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: smb-mount-healer-worker
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - smbhealer.herschel.io
+  resources:
+  - smbhosttasks
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - smbhealer.herschel.io
+  resources:
+  - smbhosttasks/status
+  - smbquarantines/status
+  verbs:
+  - update
+- apiGroups:
+  - smbhealer.herschel.io
+  resources:
+  - smbmounts
+  - smbquarantines
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - smbhealer.herschel.io
+  resources:
+  - smbmounts/status
+  verbs:
+  - patch

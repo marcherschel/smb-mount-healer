@@ -1,0 +1,18 @@
+# Samba servers for the e2e suite (and software/tilt sambaschreck):
+#   samba          shares config-a, config-b, config-c, dl, library
+#   samba-landmine share landmine (S8: dead orphan globalmount)
+# Headless Services, so //samba.smbmh-samba.svc.cluster.local/<share> resolves
+# straight to the pod IP like the DNS name of a hosted SMB share (and a restarted
+# pod gets a new IP, S13).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: smbmh-samba
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: smbmh-e2e
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - secret.yaml
+  - samba.yaml
+  - samba-landmine.yaml

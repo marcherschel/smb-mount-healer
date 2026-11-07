@@ -1,0 +1,46 @@
+{{- $fullname := include "smb-mount-healer.fullname" . -}}
+smb-mount-healer {{ .Chart.AppVersion }} (chart {{ .Chart.Version }}) is installed in namespace {{ .Release.Namespace }}.
+
+{{ if .Values.dryRun -}}
+MODE: DRY RUN - the healer only observes. Remediations walk every stage and
+end with outcome dry_run; nothing is scaled, deleted, unmounted or quarantined.
+{{- else -}}
+MODE: ENFORCING - the healer remediates broken SMB mounts: it scales workloads
+down and up, restarts the CSI node driver pod and quarantines local data.
+{{- end }}
+{{- if eq .Release.Namespace "default" }}
+
+WARNING: the release namespace is "default". Install the healer into its own
+namespace labelled pod-security.kubernetes.io/enforce=privileged (the worker
+is a privileged DaemonSet), e.g. smb-mount-healer-system.
+{{- end }}
+
+Status:
+  kubectl -n {{ .Release.Namespace }} get deploy/{{ $fullname }}-controlplane ds/{{ $fullname }}-worker
+  kubectl get smbm,smbr,smbq        # mount health, remediation episodes, quarantined data
+  kubectl get smbr -o wide          # TYPE, STAGE, OUTCOME, DRY-RUN per episode
+{{- if .Values.dryRun }}
+
+What would have happened (dry run):
+  kubectl get smbr                  # finished episodes show OUTCOME dry_run
+  kubectl get smbr <name> -o jsonpath='{.status.transitions}'
+  kubectl get smbt -o yaml          # each planned host action, result DryRun
+
+Switch to enforcing once the planned actions look right:
+  helm upgrade {{ .Release.Name }} <chart> -n {{ .Release.Namespace }} --reuse-values --set dryRun=false
+{{- else }}
+
+Switch back to observing only:
+  helm upgrade {{ .Release.Name }} <chart> -n {{ .Release.Namespace }} --reuse-values --set dryRun=true
+{{- end }}
+
+Abort a running remediation (it rolls back: replicas are restored):
+  kubectl annotate smbr <name> smbhealer.herschel.io/abort=true
+
+Quarantined data stays on the node under {{ include "smb-mount-healer.quarantineDir" . }}/<folder>
+until you move it; the matching smbq disappears once the folder is moved or empty.
+{{- if .Values.crds.keep }}
+
+The CRDs carry helm.sh/resource-policy: keep; `helm uninstall` leaves them
+(and all smbm/smbr/smbt/smbq objects) in place.
+{{- end }}

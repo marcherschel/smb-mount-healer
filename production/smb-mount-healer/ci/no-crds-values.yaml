@@ -1,0 +1,3 @@
+# CRDs managed outside the chart.
+crds:
+  install: false

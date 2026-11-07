@@ -1,0 +1,109 @@
+# Second server for S8 (dead orphan globalmount): chaos cifs-mounts its
+# share onto a globalmount, then the test deletes this Deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: samba-landmine
+  labels:
+    app.kubernetes.io/name: samba-landmine
+spec:
+  replicas: 1
+  # Never two smbd on one hostPath; a restart gets a new pod IP (S13).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: samba-landmine
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: samba-landmine
+        smbmh-e2e/samba: "true"
+    spec:
+      # Data lives in a hostPath on the server node so it survives pod
+      # restarts and scale-to-0 (S13/S14); fixtures run on the agent node.
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      tolerations:
+        - operator: Exists
+      terminationGracePeriodSeconds: 5
+      initContainers:
+        - name: init-shares
+          image: ghcr.io/servercontainers/samba:smbd-only-a3.24.2-s4.23.8-r0@sha256:42baba3bb5b0628fc6a50ca707308474718772cc3d11450dee11dafc1d3a6785
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              for s in landmine; do mkdir -p "/shares/$s"; done
+              chown -R 1000:1000 /shares
+              chmod 0775 /shares/*
+          volumeMounts:
+            - name: shares
+              mountPath: /shares
+      containers:
+        - name: samba
+          image: ghcr.io/servercontainers/samba:smbd-only-a3.24.2-s4.23.8-r0@sha256:42baba3bb5b0628fc6a50ca707308474718772cc3d11450dee11dafc1d3a6785
+          env:
+            # Env-driven config, see github.com/ServerContainers/samba
+            # (scripts/entrypoint.sh): ACCOUNT_<user>=<password>, UID_<user>,
+            # SAMBA_VOLUME_CONFIG_<id>="[share]; key = value; ...".
+            - name: ACCOUNT_e2esmbuser
+              valueFrom:
+                secretKeyRef:
+                  name: samba-credentials
+                  key: password
+            - name: UID_e2esmbuser
+              value: "1000"
+            - name: FAIL_FAST
+              value: "1"
+            - name: AVAHI_DISABLE
+              value: "1"
+            - name: WSDD2_DISABLE
+              value: "1"
+            - name: NETBIOS_DISABLE
+              value: "1"
+            - name: DISABLE_FRUIT_DEFAULTS
+              value: "1"
+            - name: SAMBA_CONF_LOG_LEVEL
+              value: "1"
+            - name: SAMBA_VOLUME_CONFIG_landmine
+              value: "[landmine]; path = /shares/landmine; valid users = e2esmbuser; guest ok = no; read only = no; browseable = yes; force user = e2esmbuser; create mask = 0664; directory mask = 0775"
+          ports:
+            - name: smb
+              containerPort: 445
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: smb
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: shares
+              mountPath: /shares
+      volumes:
+        - name: shares
+          hostPath:
+            path: /var/lib/smbmh-e2e/samba-landmine
+            type: DirectoryOrCreate
+---
+# Headless: the DNS name resolves to the (ready) pod IP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: samba-landmine
+  labels:
+    app.kubernetes.io/name: samba-landmine
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: samba-landmine
+  ports:
+    - name: smb
+      port: 445
+      targetPort: smb
+      protocol: TCP

@@ -1,0 +1,57 @@
+# k3d cluster for the smb-mount-healer e2e suite (see test/e2e/README.md).
+#
+#   make e2e-up    # k3d cluster create smbmh-e2e --config test/e2e/k3d.yaml --image rancher/k3s:$K3S_VERSION
+#
+# The cluster name and k3s image come from the command line, which overrides
+# metadata.name and image below: CI passes a unique name
+# (make e2e-up E2E_CLUSTER=smbmh-e2e-$RUN_ID), the Makefile passes the pinned
+# image from versions.env. k3d expands $VARS in this file with
+# os.ExpandEnv (no ${VAR:-default} syntax), so nothing here depends on env.
+#
+# Mount propagation: the worker, csi-smb-node and chaos pods mount
+# /var/lib/kubelet with mountPropagation: Bidirectional, which needs the node
+# container's / (and so /var/lib/kubelet) to be rshared. k3d >= v5.5 ships
+# /bin/k3d-entrypoint-mounts.sh (`mount --make-rshared /`) and enables it by
+# default (K3D_FIX_MOUNTS unset => enabled, see pkg/types/fixes/fixes.go at
+# v5.9.0). Do NOT export K3D_FIX_MOUNTS=0. hack/preflight.sh verifies the
+# result in each node's mountinfo.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: smbmh-e2e
+servers: 1
+agents: 1
+# No image: here on purpose. The Makefile passes
+# --image rancher/k3s:$K3S_VERSION (single source of truth: versions.env);
+# k3d's built-in default k3s is far older than current Kubernetes.
+registries:
+  # Name defaults to k3d-<cluster>-registry, host port is random, so parallel
+  # clusters (CI run ids) never collide. k3d writes the
+  # kube-public/local-registry-hosting ConfigMap that Tilt uses to push
+  # docker_build images. A non-empty field is needed or k3d drops the block.
+  create:
+    host: 0.0.0.0
+options:
+  k3d:
+    wait: true
+    timeout: 300s
+    # No ingress is needed; the API is reached directly.
+    disableLoadbalancer: true
+  k3s:
+    extraArgs:
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      - arg: --disable=metrics-server
+        nodeFilters:
+          - server:*
+    nodeLabels:
+      # Fixtures (workloads with SMB PVs) are pinned to the agent node, so the
+      # worker under test and the chaos pod used for injection are known.
+      - label: e2e.smbhealer.herschel.io/fixtures=true
+        nodeFilters:
+          - agent:0
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    # The Makefile and Tilt address the cluster as --context k3d-<name>.
+    switchCurrentContext: false

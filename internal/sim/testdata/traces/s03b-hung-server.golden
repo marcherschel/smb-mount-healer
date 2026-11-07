@@ -1,0 +1,72 @@
+{"t":"00:02:00","kind":"baseline","msg":"Deployment/apps/deploy-single=1"}
+{"t":"00:02:10","kind":"inject","msg":"pkill -STOP smbd"}
+{"t":"00:02:10","kind":"samba","obj":"samba.e2e.svc.cluster.local","from":"up","to":"paused"}
+{"t":"00:03:09","kind":"smbm","obj":"n1.config-a","msg":"Suspect(probe_hung) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(probe_hung)]"}
+{"t":"00:06:09","kind":"event","obj":"SmbMount/n1.config-a","reason":"Warning/MountBroken","msg":"globalmount mount gm(config-a) is Broken (probe_hung)","src":"worker/n1"}
+{"t":"00:06:09","kind":"event","obj":"SmbMount/n1.config-a","reason":"Warning/MountBroken","msg":"pod mount pod(apps/deploy-single-5d8f7c9b6-001,config-a) of pod apps/deploy-single-5d8f7c9b6-001 is Broken (probe_hung)","src":"worker/n1"}
+{"t":"00:06:09","kind":"smbr","obj":"n1-1791677169","msg":"created type=Workload smbMounts=[n1.config-a] reasons=[probe_hung] dryRun=false"}
+{"t":"00:06:09","kind":"stage","obj":"n1-1791677169","to":"pending","reason":"created"}
+{"t":"00:06:09","kind":"stage","obj":"n1-1791677169","from":"pending","to":"planning","reason":"no_scope_conflict"}
+{"t":"00:06:09","kind":"scope","obj":"n1-1791677169","msg":"workloads=[Deployment/apps/deploy-single(orig=1,in_scope)] pvs=[config-a] drain=[deploy-single-5d8f7c9b6-001]"}
+{"t":"00:06:09","kind":"cmd","obj":"SmbHostTask/n1-1791677169-planning-0","msg":"create [ProbeNow:gm(config-a)]"}
+{"t":"00:06:09","kind":"smbm","obj":"n1.config-a","msg":"Broken(probe_hung) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Broken(probe_hung)] stage=planning"}
+{"t":"00:06:10","kind":"stage","obj":"n1-1791677169","from":"planning","to":"draining","reason":"probe_completed"}
+{"t":"00:06:10","kind":"cmd","obj":"Deployment/apps/deploy-single","reason":"scale_down","msg":"scale 1 -> 0"}
+{"t":"00:06:10","kind":"smbt","obj":"n1-1791677169-planning-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:06:10","kind":"smbm","obj":"n1.config-a","msg":"Broken(probe_hung) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Broken(probe_hung)] stage=draining"}
+{"t":"00:06:11","kind":"pod","obj":"apps/deploy-single-5d8f7c9b6-001","msg":"deleting"}
+{"t":"00:06:11","kind":"scope","obj":"n1-1791677169","msg":"workloads=[Deployment/apps/deploy-single(orig=1,scaled_down)] pvs=[config-a] drain=[deploy-single-5d8f7c9b6-001]"}
+{"t":"00:06:11","kind":"smbm","obj":"n1.config-a","msg":"Broken(probe_hung) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Unknown] stage=draining"}
+{"t":"00:06:15","kind":"kubelet","obj":"n1","msg":"unpublish config-a of apps/deploy-single-5d8f7c9b6-001 failed: unmount pod(apps/deploy-single-5d8f7c9b6-001,config-a): timed out (server not responding, retry in 500ms)"}
+{"t":"00:08:10","kind":"stage","obj":"n1-1791677169","from":"draining","to":"releasing_mounts","reason":"scale_down_timeout"}
+{"t":"00:08:10","kind":"event","obj":"SmbMountRemediation/n1-1791677169","reason":"Warning/DrainTimeout","msg":"pods still present after the scale-down wait: apps/deploy-single-5d8f7c9b6-001","src":"controlplane"}
+{"t":"00:08:10","kind":"cmd","obj":"SmbHostTask/n1-1791677169-releasing-mounts-0","msg":"create [ForceUnmount:pod(apps/deploy-single-5d8f7c9b6-001,config-a)?NotHealthyMount]"}
+{"t":"00:08:10","kind":"smbm","obj":"n1.config-a","msg":"Broken(probe_hung) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Unknown] stage=releasing_mounts"}
+{"t":"00:08:11","kind":"stage","obj":"n1-1791677169","from":"releasing_mounts","to":"awaiting_unstage","reason":"host_task_completed"}
+{"t":"00:08:11","kind":"scope","obj":"n1-1791677169","msg":"workloads=[Deployment/apps/deploy-single(orig=1,scaled_down)] pvs=[config-a] drain=[deploy-single-5d8f7c9b6-001] deadGlobalmounts=config-a"}
+{"t":"00:08:11","kind":"smbt","obj":"n1-1791677169-releasing-mounts-0","to":"Succeeded","msg":"[unmount-000=Succeeded]"}
+{"t":"00:08:11","kind":"smbm","obj":"n1.config-a","msg":"Broken(probe_hung) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Unknown] stage=awaiting_unstage"}
+{"t":"00:08:23","kind":"pod","obj":"apps/deploy-single-5d8f7c9b6-001","msg":"gone"}
+{"t":"00:08:23","kind":"kubelet","obj":"n1","msg":"unstage config-a failed: unmount gm(config-a): host is down (attempt 1, retry in 500ms)"}
+{"t":"00:08:23","kind":"smbm","obj":"n1.config-a","msg":"Broken(probe_hung) gm=cifs stage=awaiting_unstage"}
+{"t":"00:08:24","kind":"kubelet","obj":"n1","msg":"unstage config-a failed: unmount gm(config-a): host is down (attempt 2, retry in 1s)"}
+{"t":"00:08:41","kind":"cmd","obj":"SmbHostTask/n1-1791677169-awaiting-unstage-0","msg":"create [ForceUnmount:gm(config-a)?NotHealthyMount]"}
+{"t":"00:08:42","kind":"stage","obj":"n1-1791677169","from":"awaiting_unstage","to":"quarantining","reason":"force_unmounted"}
+{"t":"00:08:42","kind":"cmd","obj":"SmbHostTask/n1-1791677169-quarantining-0","msg":"create [Quarantine:gm(config-a)?NotMountpoint]"}
+{"t":"00:08:42","kind":"smbt","obj":"n1-1791677169-awaiting-unstage-0","to":"Succeeded","msg":"[unmount-000=Succeeded]"}
+{"t":"00:08:42","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=empty-dir stage=quarantining"}
+{"t":"00:08:43","kind":"stage","obj":"n1-1791677169","from":"quarantining","to":"awaiting_unstage_completion","reason":"host_task_completed"}
+{"t":"00:08:43","kind":"smbt","obj":"n1-1791677169-quarantining-0","to":"Succeeded","msg":"[quarantine-000=Succeeded]"}
+{"t":"00:08:43","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=empty-dir stage=awaiting_unstage_completion"}
+{"t":"00:08:55","kind":"kubelet","obj":"n1","msg":"unstage config-a: ok (attempt 7), globalmount dir removed"}
+{"t":"00:08:55","kind":"stage","obj":"n1-1791677169","from":"awaiting_unstage_completion","to":"restarting_driver","reason":"unstage_completed"}
+{"t":"00:08:55","kind":"cmd","obj":"Pod/kube-system/csi-smb-node-n1-1","reason":"driver_restart","msg":"delete"}
+{"t":"00:08:55","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=absent stage=restarting_driver"}
+{"t":"00:08:56","kind":"inject","msg":"pkill -CONT smbd"}
+{"t":"00:08:56","kind":"samba","obj":"samba.e2e.svc.cluster.local","from":"paused","to":"up"}
+{"t":"00:08:58","kind":"driver","obj":"csi-smb-node-n1-2","msg":"created"}
+{"t":"00:09:03","kind":"driver","obj":"csi-smb-node-n1-2","msg":"ready"}
+{"t":"00:09:03","kind":"stage","obj":"n1-1791677169","from":"restarting_driver","to":"scaling_up","reason":"driver_ready"}
+{"t":"00:09:03","kind":"cmd","obj":"Deployment/apps/deploy-single","reason":"scale_up","msg":"scale 0 -> 1"}
+{"t":"00:09:03","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=absent stage=scaling_up"}
+{"t":"00:09:04","kind":"pod","obj":"apps/deploy-single-5d8f7c9b6-002","msg":"created on n1"}
+{"t":"00:09:04","kind":"kubelet","obj":"n1","msg":"stage config-a: mounted cifs //samba.e2e.svc.cluster.local/config-a"}
+{"t":"00:09:04","kind":"kubelet","obj":"n1","msg":"publish config-a into apps/deploy-single-5d8f7c9b6-002: bind of the globalmount (cifs)"}
+{"t":"00:09:04","kind":"pod","obj":"apps/deploy-single-5d8f7c9b6-002","msg":"running on n1"}
+{"t":"00:09:04","kind":"stage","obj":"n1-1791677169","from":"scaling_up","to":"verifying","reason":"scaled_up"}
+{"t":"00:09:04","kind":"scope","obj":"n1-1791677169","msg":"workloads=[Deployment/apps/deploy-single(orig=1,restored)] pvs=[config-a] drain=[deploy-single-5d8f7c9b6-001] deadGlobalmounts=config-a"}
+{"t":"00:09:04","kind":"verify","obj":"n1-1791677169","msg":"Deployment/apps/deploy-single=pending"}
+{"t":"00:09:04","kind":"cmd","obj":"SmbHostTask/n1-1791677169-verifying-0","msg":"create [ProbeNow:gm(config-a)]"}
+{"t":"00:09:04","kind":"cmd","obj":"SmbHostTask/n1-1791677169-verifying-1","msg":"create [ProbeNow:pod(apps/deploy-single-5d8f7c9b6-002,config-a)]"}
+{"t":"00:09:04","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-002:Unknown] stage=verifying"}
+{"t":"00:09:05","kind":"smbt","obj":"n1-1791677169-verifying-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:09:05","kind":"smbt","obj":"n1-1791677169-verifying-1","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:10:04","kind":"stage","obj":"n1-1791677169","from":"verifying","to":"finalizing","reason":"verified"}
+{"t":"00:10:04","kind":"stage","obj":"n1-1791677169","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:10:04","kind":"verify","obj":"n1-1791677169","msg":"Deployment/apps/deploy-single=verified"}
+{"t":"00:10:04","kind":"outcome","obj":"n1-1791677169","to":"healed","msg":"remediation finished: 1 workload(s), 1 PV(s)"}
+{"t":"00:10:04","kind":"event","obj":"SmbMountRemediation/n1-1791677169","reason":"Normal/RemediationFinished","msg":"outcome healed: remediation finished: 1 workload(s), 1 PV(s)","src":"controlplane"}
+{"t":"00:10:04","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-002:Healthy] last=healed"}
+{"t":"00:12:04","kind":"result","msg":"outcomes=[Workload:healed] healed=true"}
+{"t":"00:12:04","kind":"replicas","msg":"Deployment/apps/deploy-single=1/1"}
+{"t":"00:12:04","kind":"metrics","msg":"host_actions_total{action=force_unmount,dry_run=false,node=n1,result=succeeded}=2 host_actions_total{action=probe_now,dry_run=false,node=n1,result=succeeded}=3 host_actions_total{action=quarantine,dry_run=false,node=n1,result=succeeded}=1 probes_hung{node=n1}=0 remediations_started_total{mode=live,target_node=n1,type=Workload}=1 remediations_total{mode=live,outcome=healed,target_node=n1,type=Workload}=1 workload_actions_total{action=driver_restart,mode=live,result=success}=1 workload_actions_total{action=scale_down,mode=live,result=success}=1 workload_actions_total{action=scale_up,mode=live,result=success}=1 workload_verifications_total{result=verified}=1"}

@@ -1,0 +1,237 @@
+# -*- mode: Python -*-
+# smb-mount-healer e2e environment (plan Step 3). See test/e2e/README.md.
+#
+#   make e2e-up                 # k3d cluster smbmh-e2e (test/e2e/k3d.yaml)
+#   make e2e                    # tilt ci: bring everything up, run the suite once
+#   make e2e-dev                # tilt up: same environment, suite on manual trigger
+#
+# Resources, in dependency order:
+#   preflight -> csi-driver-smb, samba(-setup), chaos
+#             -> fixtures-storage -> fixture workloads
+#             -> smb-mount-healer-setup -> controlplane + worker
+#             -> e2e-tests
+#
+# Environment knobs:
+#   SMBMH_E2E_IMAGE_MODE=k3d-import   build with docker and `k3d image import`
+#                                     instead of pushing to the cluster's k3d
+#                                     registry (CI job containers cannot reach
+#                                     the registry's host port on localhost).
+#   SMBMH_E2E_ALLOW_CONTEXT=<ctx>     run against a context that is not
+#                                     k3d-smbmh-e2e* (the suite is destructive).
+#   E2E_GO_TEST_FLAGS                 extra flags for go test, e.g. "-run TestS1".
+
+analytics_settings(enable=False)
+# Never prune: the docker daemon is shared with other builds on this host.
+docker_prune_settings(disable=True)
+update_settings(k8s_upsert_timeout_secs=180, max_parallel_updates=3)
+# tilt ci fails as soon as any pod of a resource is in an error state, and it
+# latches that state. The healer may legitimately remediate a fixture whose
+# first CSI mount raced (silent local dir) while the environment comes up,
+# which kills that pod (exit 137 -> Error). Tolerate such transient errors; a
+# pod that stays broken (e.g. a crash-looping healer) still fails the run.
+ci_settings(k8s_grace_period='5m')
+
+PROJECT = os.path.abspath('../..')            # repository root
+
+# --- cluster guard ------------------------------------------------------------
+ctx = k8s_context()
+if not ctx.startswith('k3d-smbmh-e2e') and ctx != os.getenv('SMBMH_E2E_ALLOW_CONTEXT', ''):
+    fail('refusing to run the destructive e2e environment against context %r; ' % ctx +
+         'use `make e2e`/`make e2e-dev` (context k3d-smbmh-e2e*) or set SMBMH_E2E_ALLOW_CONTEXT')
+allow_k8s_contexts(ctx)
+CLUSTER = os.getenv('SMBMH_E2E_CLUSTER', ctx[len('k3d-'):] if ctx.startswith('k3d-') else ctx)
+
+# --- versions (single source of truth: versions.env) ---------------------------
+VERSIONS = {}
+for line in str(read_file(PROJECT + '/versions.env')).splitlines():
+    line = line.strip()
+    if line and not line.startswith('#') and '=' in line:
+        key, value = line.split('=', 1)
+        VERSIONS[key] = value
+for key in ['CSI_DRIVER_SMB_VERSION', 'CSI_DRIVER_SMB_REPO']:
+    if not VERSIONS.get(key):
+        fail('%s is missing in versions.env' % key)
+CSI_SMB_VERSION = VERSIONS['CSI_DRIVER_SMB_VERSION']
+CSI_SMB_REPO = VERSIONS['CSI_DRIVER_SMB_REPO']
+
+# --- 1. preflight -------------------------------------------------------------
+local_resource(
+    'preflight',
+    cmd=['bash', 'hack/preflight.sh', CLUSTER],
+    deps=['hack/preflight.sh'],
+    labels=['setup'],
+)
+
+# --- 2. csi-driver-smb ----------------------------------------------------------
+# Chart and version from versions.env, default values; kube-system so the controlplane's
+# csi.nodeDriver values (values-e2e.yaml, chart defaults) match csi-smb-node.
+# A plain `helm upgrade --install --wait` instead of ext://helm_resource: the
+# extension needs python3 and a GitHub fetch, neither of which the CI job
+# image (.github/ci-image) provides.
+local_resource(
+    'csi-driver-smb',
+    cmd=[
+        'helm', 'upgrade', '--install', 'csi-driver-smb', 'csi-driver-smb',
+        '--kube-context', ctx,
+        '--namespace', 'kube-system',
+        '--repo', CSI_SMB_REPO,
+        '--version', CSI_SMB_VERSION,
+        '--set', 'windows.enabled=false',
+        '--wait', '--timeout', '5m',
+    ],
+    resource_deps=['preflight'],
+    labels=['setup'],
+)
+
+# --- 3. samba -----------------------------------------------------------------
+k8s_yaml(kustomize('manifests/samba'))
+k8s_resource(
+    new_name='samba-setup',
+    objects=['smbmh-samba:namespace', 'samba-credentials:secret'],
+    resource_deps=['preflight'],
+    labels=['samba'],
+)
+k8s_resource('samba', resource_deps=['samba-setup'], labels=['samba'])
+k8s_resource('samba-landmine', resource_deps=['samba-setup'], labels=['samba'])
+
+# --- 5. chaos (before fixtures: independent) ----------------------------------
+k8s_yaml(kustomize('manifests/chaos'))
+k8s_resource('chaos', objects=['smbmh-chaos:namespace'], resource_deps=['preflight'], labels=['chaos'])
+
+# --- 4. fixtures --------------------------------------------------------------
+SHARES = ['config-a', 'config-b', 'config-c', 'dl', 'library', 'landmine']
+storage_objects = [
+    'smbmh-fixtures:namespace',
+    'storagebox-e2e-credentials:secret:kube-system',
+    'storagebox-e2e:storageclass',
+    'flux-fighter:configmap',
+    'flux-fighter:serviceaccount',
+    'flux-fighter:role',
+    'flux-fighter:rolebinding',
+]
+for s in SHARES:
+    storage_objects.append('storagebox-e2e-%s:persistentvolume' % s)
+    storage_objects.append('storagebox-e2e-%s-claim:persistentvolumeclaim' % s)
+
+k8s_yaml(kustomize('manifests/fixtures'))
+k8s_resource(
+    new_name='fixtures-storage',
+    objects=storage_objects,
+    resource_deps=['csi-driver-smb', 'samba', 'samba-landmine'],
+    labels=['fixtures'],
+)
+FIXTURE_WORKLOADS = ['deploy-single', 'sts-single', 'two-vol', 'cotenant-a', 'cotenant-b']
+for w in FIXTURE_WORKLOADS:
+    k8s_resource(w, resource_deps=['fixtures-storage'], labels=['fixtures'])
+# replicas 0: nothing to wait for.
+k8s_resource('landmine-app', resource_deps=['fixtures-storage'], pod_readiness='ignore', labels=['fixtures'])
+k8s_resource('flux-fighter', resource_deps=['fixtures-storage'], labels=['fixtures'])
+
+# --- 6. smb-mount-healer ------------------------------------------------------
+HEALER_SRC = [PROJECT + '/' + p for p in ['go.mod', 'go.sum', 'api', 'cmd', 'internal', 'Dockerfile.tilt']]
+if os.getenv('SMBMH_E2E_IMAGE_MODE', '') == 'k3d-import':
+    # The cluster has a k3d registry, so Tilt injects the image as
+    # <registry-as-seen-from-cluster>/smb-mount-healer:<tag> while
+    # $EXPECTED_REF uses the host-side push address (localhost:<port>).
+    # Import the image under the cluster-side name, and skip Tilt's local
+    # docker re-tag (skips_local_docker) so the injected tag is exactly
+    # $EXPECTED_REF's tag.
+    # --mode direct streams the image into each node's containerd. The
+    # default tools-node mode raced on the hosted runner (ctr: open
+    # /k3d/images/...tar: no such file or directory) and still reported
+    # success, so check that every node has the image afterwards.
+    custom_build(
+        'smb-mount-healer',
+        ('docker build -t $EXPECTED_REF -f Dockerfile.tilt . && ' +
+         'CLUSTER_REF="k3d-%s-registry:5000/${EXPECTED_REF#*/}" && ' +
+         'docker tag $EXPECTED_REF "$CLUSTER_REF" && ' +
+         'k3d image import --mode direct -c %s "$CLUSTER_REF" && ' +
+         'for n in $(docker ps -q --filter label=k3d.cluster=%s --filter label=k3d.role=server) ' +
+         '$(docker ps -q --filter label=k3d.cluster=%s --filter label=k3d.role=agent); do ' +
+         'docker exec "$n" ctr -n k8s.io images ls -q | grep -qxF "$CLUSTER_REF" || ' +
+         '{ echo "image $CLUSTER_REF missing on node container $n" >&2; exit 1; }; done') % (CLUSTER, CLUSTER, CLUSTER, CLUSTER),
+        deps=HEALER_SRC,
+        dir=PROJECT,
+        disable_push=True,
+        skips_local_docker=True,
+    )
+else:
+    docker_build(
+        'smb-mount-healer',
+        context=PROJECT,
+        dockerfile=PROJECT + '/Dockerfile.tilt',
+        only=['go.mod', 'go.sum', 'api', 'cmd', 'internal'],
+        ignore=['**/*_test.go', '**/testdata'],
+    )
+
+# The Helm chart (production/smb-mount-healer), exactly as prod installs it,
+# with the Tilt image ref and short timeouts from values-e2e.yaml. The chart
+# does not create its namespace; manifests/healer-namespace.yaml does (PSA
+# privileged labels).
+k8s_yaml('manifests/healer-namespace.yaml')
+k8s_yaml(helm(
+    PROJECT + '/production/smb-mount-healer',
+    name='smb-mount-healer',
+    namespace='smb-mount-healer-system',
+    values=[PROJECT + '/test/e2e/values-e2e.yaml'],
+))
+k8s_resource(
+    new_name='smb-mount-healer-setup',
+    objects=[
+        'smb-mount-healer-system:namespace',
+        'smbmounts.smbhealer.herschel.io:customresourcedefinition',
+        'smbmountremediations.smbhealer.herschel.io:customresourcedefinition',
+        'smbhosttasks.smbhealer.herschel.io:customresourcedefinition',
+        'smbquarantines.smbhealer.herschel.io:customresourcedefinition',
+        'smb-mount-healer-controlplane:serviceaccount',
+        'smb-mount-healer-worker:serviceaccount',
+        'smb-mount-healer-leader-election:role',
+        'smb-mount-healer-leader-election:rolebinding',
+        'smb-mount-healer-controlplane:clusterrole',
+        'smb-mount-healer-worker:clusterrole',
+        'smb-mount-healer-controlplane:clusterrolebinding',
+        'smb-mount-healer-worker:clusterrolebinding',
+    ],
+    resource_deps=['preflight'],
+    labels=['healer'],
+)
+# The healer starts once the fixtures are mounted, so S1 sees a steady state.
+HEALER_DEPS = ['smb-mount-healer-setup', 'csi-driver-smb', 'chaos'] + FIXTURE_WORKLOADS
+k8s_resource('smb-mount-healer-controlplane', resource_deps=HEALER_DEPS, labels=['healer'])
+k8s_resource('smb-mount-healer-worker', resource_deps=HEALER_DEPS, labels=['healer'])
+
+# --- 7. e2e-tests -------------------------------------------------------------
+# SMBMH_E2E_SETUP_ONLY=1 (make e2e-run): tilt ci only brings the environment up
+# and exits; make then runs the suite with plain `go test`. The suite is
+# destructive (it kills and scales fixture, samba and healer pods), which tilt
+# ci would report as resource errors if it were still watching.
+SETUP_ONLY = os.getenv('SMBMH_E2E_SETUP_ONLY', '') == '1'
+IS_CI = config.tilt_subcommand == 'ci'
+if not SETUP_ONLY:
+    local_resource(
+        'e2e-tests',
+        # Teed to $E2E_LOG_DIR/<cluster>.go-test.log (pipefail keeps go test's
+        # exit code) so the run can be followed and inspected afterwards.
+        # hack/go-test.sh adds a "=== PROGRESS n/total (x%)" line per test.
+        cmd=['bash', '-c', 'set -o pipefail; mkdir -p "$E2E_LOG_DIR"; ' +
+             'test/e2e/hack/go-test.sh %s 2>&1 | tee "$E2E_LOG_DIR/%s.go-test.log"' % (
+                 os.getenv('E2E_GO_TEST_FLAGS', ''), CLUSTER)],
+        dir=PROJECT,
+        env={
+            'E2E_KUBE_CONTEXT': ctx,
+            'E2E_CLUSTER': CLUSTER,
+            'E2E_LOG_DIR': os.getenv('E2E_LOG_DIR', PROJECT + '/test/e2e/_runs'),
+        },
+        resource_deps=[
+            'smb-mount-healer-controlplane',
+            'smb-mount-healer-worker',
+            'flux-fighter',
+            'landmine-app',
+            'chaos',
+        ],
+        # tilt ci: run once automatically (its result is the ci result).
+        # tilt up: press the trigger button / `tilt trigger e2e-tests`.
+        auto_init=IS_CI,
+        trigger_mode=TRIGGER_MODE_AUTO if IS_CI else TRIGGER_MODE_MANUAL,
+        labels=['tests'],
+    )

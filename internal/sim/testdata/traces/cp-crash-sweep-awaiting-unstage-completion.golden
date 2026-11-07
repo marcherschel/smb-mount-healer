@@ -1,0 +1,43 @@
+{"t":"00:02:00","kind":"baseline","msg":"Deployment/apps/deploy-single=1"}
+{"t":"00:02:10","kind":"inject","msg":"umount -l gm(config-a); write a file into the bare dir; scale deploy-single to 0"}
+{"t":"00:02:10","kind":"scale","obj":"Deployment/apps/deploy-single","to":"0","reason":"human"}
+{"t":"00:02:10","kind":"pod","obj":"apps/deploy-single-5d8f7c9b6-001","msg":"deleting"}
+{"t":"00:02:10","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=dir-with-data pods=[deploy-single-5d8f7c9b6-001:Unknown]"}
+{"t":"00:02:14","kind":"pod","obj":"apps/deploy-single-5d8f7c9b6-001","msg":"gone"}
+{"t":"00:02:14","kind":"kubelet","obj":"n1","msg":"unstage config-a failed: remove gm(config-a): directory not empty (attempt 1, retry in 500ms)"}
+{"t":"00:02:14","kind":"smbr","obj":"n1-1791676934","msg":"created type=Sweep smbMounts=[n1.config-a] reasons=[globalmount_not_empty] dryRun=false"}
+{"t":"00:02:14","kind":"stage","obj":"n1-1791676934","to":"planning","reason":"created"}
+{"t":"00:02:14","kind":"cmd","obj":"SmbHostTask/n1-1791676934-planning-0","msg":"create [ProbeNow:gm(config-a)]"}
+{"t":"00:02:14","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=dir-with-data stage=planning"}
+{"t":"00:02:15","kind":"kubelet","obj":"n1","msg":"unstage config-a failed: remove gm(config-a): directory not empty (attempt 2, retry in 1s)"}
+{"t":"00:02:15","kind":"stage","obj":"n1-1791676934","from":"planning","to":"sweeping","reason":"probe_completed"}
+{"t":"00:02:15","kind":"scope","obj":"n1-1791676934","msg":"workloads=[] pvs=[config-a] drain=[]"}
+{"t":"00:02:15","kind":"cmd","obj":"SmbHostTask/n1-1791676934-sweeping-0","msg":"create [Quarantine:gm(config-a)?NotMountpoint]"}
+{"t":"00:02:15","kind":"smbt","obj":"n1-1791676934-planning-0","to":"Succeeded","msg":"[probe-000=Succeeded]"}
+{"t":"00:02:15","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=dir-with-data stage=sweeping"}
+{"t":"00:02:16","kind":"event","obj":"SmbQuarantine/n1.config-a-20261011t000216z","reason":"Warning/ShadowDataQuarantined","msg":"quarantine folder q/config-a-20261011T000216Z holds 1 file(s), 64 byte(s) of shadow data of PV config-a; move the data off the node to resolve","src":"worker/n1"}
+{"t":"00:02:16","kind":"stage","obj":"n1-1791676934","from":"sweeping","to":"awaiting_unstage_completion","reason":"host_task_completed"}
+{"t":"00:02:16","kind":"crash","obj":"SmbMountRemediation/n1-1791676934","msg":"control plane dies right after persisting stage awaiting_unstage_completion (before its commands)"}
+{"t":"00:02:16","kind":"controlplane","msg":"crashed (down 0s)"}
+{"t":"00:02:16","kind":"smbt","obj":"n1-1791676934-sweeping-0","to":"Succeeded","msg":"[quarantine-000=Succeeded->q/config-a-20261011T000216Z(1 entries)]"}
+{"t":"00:02:16","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=empty-dir stage=sweeping"}
+{"t":"00:02:16","kind":"smbq","obj":"n1.config-a-20261011t000216z","msg":"created pv=config-a files=1 entries=1 bytes=64 source=gm(config-a) remediationRef=\"n1-1791676934\""}
+{"t":"00:02:17","kind":"controlplane","msg":"started (fresh process #2)"}
+{"t":"00:02:17","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=empty-dir quarantines=1 stage=awaiting_unstage_completion"}
+{"t":"00:02:18","kind":"kubelet","obj":"n1","msg":"unstage config-a: ok (attempt 4), globalmount dir removed"}
+{"t":"00:02:18","kind":"stage","obj":"n1-1791676934","from":"awaiting_unstage_completion","to":"finalizing","reason":"unstage_completed"}
+{"t":"00:02:18","kind":"stage","obj":"n1-1791676934","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:02:18","kind":"outcome","obj":"n1-1791676934","to":"healed","msg":"remediation finished: 0 workload(s), 1 PV(s)"}
+{"t":"00:02:18","kind":"event","obj":"SmbMountRemediation/n1-1791676934","reason":"Normal/RemediationFinished","msg":"outcome healed: remediation finished: 0 workload(s), 1 PV(s)","src":"controlplane"}
+{"t":"00:02:18","kind":"smbm","obj":"n1.config-a","msg":"Unknown gm=absent quarantines=1 last=healed"}
+{"t":"00:02:19","kind":"inject","msg":"sweep finished: scale deploy-single back to 1"}
+{"t":"00:02:19","kind":"scale","obj":"Deployment/apps/deploy-single","to":"1","reason":"human"}
+{"t":"00:02:19","kind":"pod","obj":"apps/deploy-single-5d8f7c9b6-002","msg":"created on n1"}
+{"t":"00:02:19","kind":"kubelet","obj":"n1","msg":"stage config-a: mounted cifs //samba.e2e.svc.cluster.local/config-a"}
+{"t":"00:02:19","kind":"kubelet","obj":"n1","msg":"publish config-a into apps/deploy-single-5d8f7c9b6-002: bind of the globalmount (cifs)"}
+{"t":"00:02:19","kind":"pod","obj":"apps/deploy-single-5d8f7c9b6-002","msg":"running on n1"}
+{"t":"00:02:19","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-002:Unknown] quarantines=1 last=healed"}
+{"t":"00:03:19","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-002:Healthy] quarantines=1 last=healed"}
+{"t":"00:04:18","kind":"result","msg":"outcomes=[Sweep:healed] healed=true"}
+{"t":"00:04:18","kind":"replicas","msg":"Deployment/apps/deploy-single=1/1"}
+{"t":"00:04:18","kind":"metrics","msg":"host_actions_total{action=probe_now,dry_run=false,node=n1,result=succeeded}=1 host_actions_total{action=quarantine,dry_run=false,node=n1,result=succeeded}=1 probes_hung{node=n1}=0 quarantines{node=n1,pv=config-a}=1 remediations_resumed_total{stage=awaiting_unstage_completion}=1 remediations_started_total{mode=live,target_node=n1,type=Sweep}=1 remediations_total{mode=live,outcome=healed,target_node=n1,type=Sweep}=1"}

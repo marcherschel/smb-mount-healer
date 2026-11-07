@@ -1,0 +1,45 @@
+# Chart values for the e2e environment (test/e2e/Tiltfile): the image Tilt
+# builds and substitutes, and short timeouts so the scenarios finish in
+# minutes. Everything else is the chart default.
+image:
+  # Tilt's docker_build('smb-mount-healer', ...) matches this ref by name and
+  # rewrites it to the image it built.
+  repository: smb-mount-healer
+  tag: dev
+
+# csi-driver-smb is installed into kube-system by the Tiltfile; its node
+# DaemonSet csi-smb-node has pod label app=csi-smb-node (the chart defaults).
+csi:
+  nodeDriver:
+    namespace: kube-system
+    labelSelector: app=csi-smb-node
+
+# Debug logs every failed probe (op, class, detail) and are kept in the CI
+# failure artifacts.
+logging:
+  level: debug
+
+controlplane:
+  remediation:
+    scaleDownWait: 30s
+    unstageWait: 10s
+    quarantineUnstageWait: 60s
+    driverRestartWait: 30s
+    verifyWait: 45s
+    verifyNoPodGrace: 15s
+    backoffBase: 20s
+
+worker:
+  probing:
+    checkInterval: 10s
+    recheckDelay: 1s
+    # Must exceed S3's 20s smbd freeze plus the client's recovery tail: on
+    # kernel 6.17 a mount can keep timing out ~20s after smbd resumes.
+    slowConfirmWindow: 60s
+    podStartupGrace: 10s
+  quarantineScan:
+    interval: 10s
+
+metrics:
+  podMonitor:
+    enabled: false

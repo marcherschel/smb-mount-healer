@@ -1,0 +1,19 @@
+{{- if .Values.metrics.service.enabled }}
+{{- $ctx := dict "context" . "component" "controlplane" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "smb-mount-healer.componentName" $ctx }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "smb-mount-healer.componentLabels" $ctx | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "smb-mount-healer.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http-metrics
+      port: 8080
+      targetPort: http-metrics
+      protocol: TCP
+{{- end }}

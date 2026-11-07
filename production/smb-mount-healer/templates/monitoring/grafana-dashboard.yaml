@@ -1,0 +1,24 @@
+{{- if .Values.monitoring.grafanaDashboard.enabled }}
+{{- $cfg := .Values.monitoring.grafanaDashboard }}
+{{- $ctx := dict "context" . "component" "monitoring" }}
+# Grafana dashboard for the Grafana sidecar (k8s-sidecar, as in the
+# kube-prometheus-stack and grafana charts), which loads every ConfigMap with
+# the configured label. Source: monitoring/dashboards/smb-mount-healer.json.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "smb-mount-healer.fullname" . }}-dashboard
+  namespace: {{ default .Release.Namespace $cfg.namespace }}
+  labels:
+    {{- include "smb-mount-healer.componentLabels" $ctx | nindent 4 }}
+    {{- with $cfg.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $cfg.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  smb-mount-healer.json: |-
+    {{- .Files.Get "files/smb-mount-healer.json" | trimSuffix "\n" | nindent 4 }}
+{{- end }}

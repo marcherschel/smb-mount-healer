@@ -1,0 +1,41 @@
+# https://www.chainguard.dev/unchained/running-renovate-as-a-github-action
+# Renovate runs with a short-lived octo-sts token (identity "renovate", policy
+# .github/chainguard/renovate.sts.yaml) instead of a stored PAT. The token can
+# edit workflow files, which the GITHUB_TOKEN cannot, so action pin and CI
+# image updates work.
+name: Renovate Dependency Updates
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  renovate:
+    name: Renovate
+    # GitHub-hosted on purpose: this repository is public, and self-hosted
+    # runners must not be reachable from workflows of fork pull requests.
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write # required for federation
+      contents: write
+
+    steps:
+      - uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: octo-sts
+        with:
+          scope: ${{ github.repository }}
+          identity: renovate
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@1c0cf989c02653fba0efe7ca5772338860ca71dc # v46.3.12
+        env:
+          RENOVATE_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          # postUpgradeTasks in renovate.json: bump the chart version when an
+          # app release moves the chart's appVersion.
+          RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS: '["^hack/bump-chart-version\\.sh (patch|minor|major) "]'

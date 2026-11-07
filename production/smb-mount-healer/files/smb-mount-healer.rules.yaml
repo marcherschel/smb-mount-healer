@@ -1,0 +1,70 @@
+# Prometheus alerting rules for smb-mount-healer (plain rule file format,
+# usable with Prometheus `rule_files`, Mimir/Cortex/Thanos rulers and
+# `promtool check rules`).
+#
+# This file is the source of truth: hack/sync-chart.sh copies it into the
+# chart (monitoring.prometheusRule.enabled renders it as a PrometheusRule),
+# and every release attaches it as an asset. Runbooks: docs/runbooks/<alert>.md.
+#
+# Metric labels: worker series carry `node`, control-plane series carry
+# `target_node` (see internal/metrics/names.go).
+groups:
+  - name: smb-mount-healer
+    rules:
+      - alert: SmbMountHealerControlPlaneAbsent
+        expr: |
+          absent(smb_mount_healer_build_info{component="controlplane"})
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: The smb-mount-healer control plane is not reporting.
+          description: |
+            No smb-mount-healer control plane has reported smb_mount_healer_build_info for 30 minutes.
+            Without the control plane, broken SMB mounts are still detected by the workers but nothing remediates them.
+            absent() is sensitive to ingestion lag: with remote_write, a backed-up queue delays the series, so rule out lag first.
+          runbook_url: https://github.com/marcherschel/smb-mount-healer/blob/main/docs/runbooks/SmbMountHealerControlPlaneAbsent.md
+
+      - alert: SmbMountHealerRemediationFailed
+        expr: |
+          sum by (target_node, outcome) (
+            increase(smb_mount_healer_remediations_total{mode="live",outcome=~"verify_failed|rolled_back|failed|skipped_no_owner"}[1h])
+          ) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: An smb-mount-healer remediation ended without healing the mount.
+          description: |
+            {{ $value | printf "%.0f" }} smb-mount-healer remediation(s) on node {{ $labels.target_node }} ended with outcome {{ $labels.outcome }} in the past hour.
+            The episode stopped without healing the mount, so the affected workloads may be scaled down, rolled back onto a still-broken mount, or writing to node-local disk.
+            A human has to look at kubectl get smbr -l smbhealer.herschel.io/node={{ $labels.target_node }}. The alert clears one hour after the last failure.
+          runbook_url: https://github.com/marcherschel/smb-mount-healer/blob/main/docs/runbooks/SmbMountHealerRemediationFailed.md
+
+      - alert: SmbMountHealerRemediationLoop
+        expr: |
+          max by (target_node) (increase(smb_mount_healer_remediations_started_total{mode="live",type="Workload"}[1h])) > 2
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: smb-mount-healer is stuck in a remediation loop.
+          description: |
+            The smb-mount-healer started {{ $value | printf "%.0f" }} workload remediations for node {{ $labels.target_node }} in the past hour.
+            A remediation that does not stick puts the workloads on the affected SMB volume into a scale-down/scale-up loop, and their pods may be writing to node-local disk instead of the SMB share.
+            Check kubectl get smbr -l smbhealer.herschel.io/node={{ $labels.target_node }}.
+          runbook_url: https://github.com/marcherschel/smb-mount-healer/blob/main/docs/runbooks/SmbMountHealerRemediationLoop.md
+
+      - alert: SmbMountHealerShadowDataPending
+        expr: |
+          max by (node, pv) (smb_mount_healer_quarantines) > 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: Data written while an SMB mount was dead is waiting in quarantine.
+          description: |
+            Node {{ $labels.node }} holds {{ $value | printf "%.0f" }} quarantine folder(s) for PV {{ $labels.pv }}.
+            Pods wrote this data to the node's local disk while the SMB mount was dead, and the healer moved it aside instead of deleting it.
+            It never reaches the SMB share on its own: list it with kubectl get smbq and merge it back by hand.
+          runbook_url: https://github.com/marcherschel/smb-mount-healer/blob/main/docs/runbooks/SmbMountHealerShadowDataPending.md

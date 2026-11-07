@@ -1,0 +1,122 @@
+version: "2"
+
+run:
+  relative-path-mode: gomod
+  build-tags:
+    - envtest
+    - e2e
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - copyloopvar
+    - depguard
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - gocritic
+    - misspell
+    - nolintlint
+    - revive
+    - unconvert
+    - usestdlibvars
+  settings:
+    exhaustive:
+      # State enums (Health, Stage, Outcome, HostActionType, ...) must be
+      # handled explicitly; a default case does not count.
+      check:
+        - switch
+      default-signifies-exhaustive: false
+    forbidigo:
+      # Only active in the pure packages (see exclusions below).
+      analyze-types: true
+      forbid:
+        - pattern: ^time\.(Now|Sleep|Since|Until|After|AfterFunc|Tick|NewTimer|NewTicker)$
+          msg: pure packages take time as an input (Observation.Now / now argument)
+        - pattern: ^os\.
+          pkg: ^os$
+          msg: pure packages must not touch the host
+        - pattern: ^rand\.
+          pkg: ^math/rand(/v2)?$
+          msg: pure packages must be deterministic
+    depguard:
+      rules:
+        pure:
+          list-mode: lax
+          files:
+            - "**/internal/health/*.go"
+            - "**/internal/remediation/*.go"
+            - "**/internal/inventory/*.go"
+            - "**/internal/command/*.go"
+            - "**/internal/hostfs/*.go"
+            - "!$test"
+          deny:
+            - pkg: sigs.k8s.io/controller-runtime
+              desc: pure packages must not use controller-runtime (clients, managers, reconcilers)
+            - pkg: k8s.io/client-go
+              desc: pure packages must not talk to the API server
+            - pkg: os/exec
+              desc: pure packages must not spawn processes
+            - pkg: os
+              desc: pure packages must not touch the host
+            - pkg: net
+              desc: pure packages must not do network I/O
+            - pkg: github.com/marcherschel/smb-mount-healer/internal/hostfs/linux
+              desc: use the hostfs interfaces
+            - pkg: github.com/marcherschel/smb-mount-healer/internal/probe$
+              desc: pure packages must not spawn probes
+            - pkg: github.com/marcherschel/smb-mount-healer/internal/kube$
+              desc: pure packages must not talk to the API server
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+          arguments:
+            - allowed-packages:
+                - github.com/onsi/gomega
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: increment-decrement
+        - name: var-naming
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - std-error-handling
+    paths:
+      - api/v1alpha1/applyconfiguration
+    rules:
+      # forbidigo enforces purity only in the pure packages.
+      - path-except: ^internal/(health|remediation|inventory|command)/|^internal/hostfs/[^/]+\.go$
+        linters:
+          - forbidigo
+      - path: _test\.go
+        linters:
+          - forbidigo
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/marcherschel/smb-mount-healer
+  exclusions:
+    generated: lax

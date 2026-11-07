@@ -1,0 +1,15 @@
+# Fault injection: one privileged pod per node with the host's
+# /var/lib/kubelet (Bidirectional), driven by the suite through client-go exec
+# (framework Chaos.Exec). Used for umount -l of globalmounts, seeding shadow
+# files and orphan pod dirs, cifs-mounting samba-landmine, and quarantine-dir
+# manipulation.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: smbmh-chaos
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: smbmh-e2e
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - daemonset.yaml

@@ -1,0 +1,11 @@
+# The chart does not create its namespace. The worker is privileged with a
+# Bidirectional hostPath, which the baseline and restricted Pod Security
+# levels reject.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smb-mount-healer-system
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

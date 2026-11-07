@@ -1,0 +1,27 @@
+{"t":"00:02:00","kind":"baseline","msg":"Deployment/apps/deploy-single=1"}
+{"t":"00:02:01","kind":"inject","msg":"cifs-mount samba-landmine onto gm(landmine) and onto an unknown globalmount hash"}
+{"t":"00:02:01","kind":"smbm","obj":"n1.landmine","msg":"Healthy gm=cifs"}
+{"t":"00:03:30","kind":"inject","msg":"delete samba-landmine"}
+{"t":"00:03:30","kind":"samba","obj":"samba-landmine.e2e.svc.cluster.local","from":"up","to":"down"}
+{"t":"00:04:01","kind":"smbm","obj":"n1.landmine","msg":"Suspect(stat_error) gm=cifs"}
+{"t":"00:04:07","kind":"event","obj":"SmbMount/n1.landmine","reason":"Warning/MountBroken","msg":"globalmount mount gm(landmine) is Broken (stat_error)","src":"worker/n1"}
+{"t":"00:04:07","kind":"smbr","obj":"n1-1791677047","msg":"created type=Sweep smbMounts=[n1.landmine] reasons=[orphan_globalmount_broken] dryRun=false"}
+{"t":"00:04:07","kind":"stage","obj":"n1-1791677047","to":"planning","reason":"created"}
+{"t":"00:04:07","kind":"cmd","obj":"SmbHostTask/n1-1791677047-planning-0","msg":"create [ProbeNow:gm(config-a) ProbeNow:gm(landmine)]"}
+{"t":"00:04:07","kind":"smbm","obj":"n1.landmine","msg":"Broken(stat_error) gm=cifs stage=planning"}
+{"t":"00:04:08","kind":"stage","obj":"n1-1791677047","from":"planning","to":"sweeping","reason":"probe_completed"}
+{"t":"00:04:08","kind":"scope","obj":"n1-1791677047","msg":"workloads=[] pvs=[landmine] drain=[] deadGlobalmounts=landmine"}
+{"t":"00:04:08","kind":"cmd","obj":"SmbHostTask/n1-1791677047-sweeping-0","msg":"create [ForceUnmount:gm(landmine)?NotHealthyMount Quarantine:gm(landmine)?NotMountpoint]"}
+{"t":"00:04:08","kind":"smbt","obj":"n1-1791677047-planning-0","to":"Succeeded","msg":"[probe-000=Succeeded probe-001=Succeeded]"}
+{"t":"00:04:08","kind":"smbm","obj":"n1.landmine","msg":"Broken(stat_error) gm=cifs stage=sweeping"}
+{"t":"00:04:09","kind":"stage","obj":"n1-1791677047","from":"sweeping","to":"awaiting_unstage_completion","reason":"host_task_completed"}
+{"t":"00:04:09","kind":"stage","obj":"n1-1791677047","from":"awaiting_unstage_completion","to":"finalizing","reason":"unstage_completed"}
+{"t":"00:04:09","kind":"stage","obj":"n1-1791677047","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:04:09","kind":"outcome","obj":"n1-1791677047","to":"healed","msg":"remediation finished: 0 workload(s), 1 PV(s)"}
+{"t":"00:04:09","kind":"event","obj":"SmbMountRemediation/n1-1791677047","reason":"Normal/RemediationFinished","msg":"outcome healed: remediation finished: 0 workload(s), 1 PV(s)","src":"controlplane"}
+{"t":"00:04:09","kind":"smbt","obj":"n1-1791677047-sweeping-0","to":"Succeeded","msg":"[unmount-000=Succeeded quarantine-001=Succeeded]"}
+{"t":"00:04:09","kind":"smbm","obj":"n1.landmine","msg":"Unknown gm=empty-dir last=healed"}
+{"t":"00:04:10","kind":"smbm","obj":"n1.landmine","msg":"deleted"}
+{"t":"00:06:09","kind":"result","msg":"outcomes=[Sweep:healed] healed=true"}
+{"t":"00:06:09","kind":"replicas","msg":"Deployment/apps/deploy-single=1/1"}
+{"t":"00:06:09","kind":"metrics","msg":"host_actions_total{action=force_unmount,dry_run=false,node=n1,result=succeeded}=1 host_actions_total{action=probe_now,dry_run=false,node=n1,result=succeeded}=2 host_actions_total{action=quarantine,dry_run=false,node=n1,result=succeeded}=1 probes_hung{node=n1}=0 remediations_started_total{mode=live,target_node=n1,type=Sweep}=1 remediations_total{mode=live,outcome=healed,target_node=n1,type=Sweep}=1"}

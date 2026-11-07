@@ -1,0 +1,37 @@
+{
+  "name": "smb-mount-healer",
+  // Go version: keep in line with the toolchain line in go.mod.
+  "image": "mcr.microsoft.com/devcontainers/go:2-1.27-bookworm",
+  "features": {
+    // k3d for the e2e suite (make e2e) and docker buildx for make image.
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {
+      "version": "latest",
+      "dockerDashComposeVersion": "none"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  // kubectl, helm, k3d, tilt, golangci-lint and yq at the versions.env pins.
+  "postCreateCommand": "make tools",
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "go.lintTool": "golangci-lint",
+        "go.buildTags": "envtest,e2e",
+        "[yaml]": {
+          "editor.insertSpaces": true,
+          "editor.tabSize": 2
+        }
+      },
+      "extensions": [
+        "golang.go",
+        "redhat.vscode-yaml",
+        "github.vscode-github-actions",
+        "timonwong.shellcheck",
+        "tilt-dev.tiltfile"
+      ]
+    }
+  }
+}

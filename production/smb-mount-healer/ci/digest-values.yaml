@@ -1,0 +1,5 @@
+# Pinned image: repository:tag@digest.
+image:
+  repository: registry.example.com/smb-mount-healer
+  tag: 1.2.3
+  digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

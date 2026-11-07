@@ -1,0 +1,49 @@
+{{- if .Values.controlplane.leaderElection.enabled }}
+{{- $ctx := dict "context" . "component" "controlplane" }}
+# Leader election for --controlplane: the Lease <fullname>-controlplane in the
+# release namespace (LEADER_ELECTION_ID), plus leader-election Events.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "smb-mount-healer.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "smb-mount-healer.componentLabels" $ctx | nindent 4 }}
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "smb-mount-healer.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "smb-mount-healer.componentLabels" $ctx | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "smb-mount-healer.fullname" . }}-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "smb-mount-healer.serviceAccountName" $ctx }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

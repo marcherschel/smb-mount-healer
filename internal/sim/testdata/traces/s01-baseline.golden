@@ -1,0 +1,4 @@
+{"t":"00:02:00","kind":"baseline","msg":"Deployment/apps/deploy-single=1 StatefulSet/apps/sts-single=1 Deployment/apps/two-vol=1 Deployment/apps/cotenant-a=1 Deployment/apps/cotenant-b=1"}
+{"t":"00:07:00","kind":"result","msg":"outcomes=[] healed=true"}
+{"t":"00:07:00","kind":"replicas","msg":"Deployment/apps/deploy-single=1/1 StatefulSet/apps/sts-single=1/1 Deployment/apps/two-vol=1/1 Deployment/apps/cotenant-a=1/1 Deployment/apps/cotenant-b=1/1"}
+{"t":"00:07:00","kind":"metrics","msg":"probes_hung{node=n1}=0"}
