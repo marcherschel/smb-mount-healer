@@ -21,7 +21,6 @@ on:
 
 permissions:
   contents: read
-  packages: read # pull the CI image from GHCR
 
 concurrency:
   # workflow_call runs share the caller's run; keep them out of the PR group.
@@ -86,10 +85,6 @@ jobs:
     container:
       # CI toolbox built from .github/ci-image (workflow ci-image.yaml).
       image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
-      # Pulling the CI image needs credentials while its GHCR package is private.
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       # make chart-test runs the pinned kubeconform and promtool images.
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
@@ -153,10 +148,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
-      # Pulling the CI image needs credentials while its GHCR package is private.
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -203,10 +194,6 @@ jobs:
     timeout-minutes: 90
     container:
       image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
-      # Pulling the CI image needs credentials while its GHCR package is private.
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
     env:
