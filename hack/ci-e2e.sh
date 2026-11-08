@@ -5,7 +5,9 @@
 #
 #   hack/ci-e2e.sh connect    <cluster>         join this container to k3d-<cluster>
 #   hack/ci-e2e.sh kubeconfig <cluster>         point $KUBECONFIG at k3d-<cluster>-server-0:6443
-#   hack/ci-e2e.sh collect    <cluster> <dir>   dump CRs, events, logs, node mountinfo into <dir>
+#   hack/ci-e2e.sh pin        <cluster> <cpus>  pin the k3d node containers to <cpus> (e.g. 0,1)
+#   hack/ci-e2e.sh info       <cluster>         print runner VM, kernel and cifs module details
+#   hack/ci-e2e.sh collect    <cluster> <dir>   dump CRs, events, logs, node mountinfo, cifs state into <dir>
 #   hack/ci-e2e.sh cleanup    <cluster>         leave the k3d network, remove tilt-built images
 #
 # The cluster itself is created/deleted with make e2e-up / e2e-down.
@@ -73,6 +75,39 @@ cmd_kubeconfig() {
     return 1
 }
 
+# Node containers of the cluster (servers, agents, registry).
+cluster_nodes() {
+    docker ps -a --filter "label=k3d.cluster=${1:?cluster}" --format '{{.Names}}'
+}
+
+# Restricts every node container (and so k3s, kubelet, the healer, samba and
+# the workloads) to <cpus>; emulates a smaller runner VM. The CIFS client runs
+# in the host kernel and is not confined by the cpuset.
+cmd_pin() {
+    local cluster=${1:?cluster} cpus=${2:?cpus} node
+    for node in $(cluster_nodes "${cluster}"); do
+        docker update --cpuset-cpus="${cpus}" "${node}" >/dev/null
+        echo "${node}: cpuset ${cpus}, nproc inside: $(docker exec "${node}" nproc)"
+    done
+}
+
+# The job container shares the host kernel but not its view of kernel modules;
+# read kernel and cifs details through a (privileged) node container.
+cmd_info() {
+    local cluster=${1:?cluster} node
+    node=$(cluster_nodes "${cluster}" | grep -- '-server-0$' | head -n1 || true)
+    echo "runner: ${RUNNER_NAME:-?} image ${ImageOS:-?} ${ImageVersion:-?}"
+    echo "host nproc (job container): $(nproc)"
+    grep -m1 'model name' /proc/cpuinfo || true
+    grep -E '^(MemTotal|MemAvailable):' /proc/meminfo || true
+    echo "kernel: $(uname -r)"
+    if [ -n "${node}" ]; then
+        echo "nproc in ${node}: $(docker exec "${node}" nproc)"
+        echo "cifs module: $(docker exec "${node}" cat /sys/module/cifs/version 2>/dev/null || echo 'not loaded')"
+        echo "sch_netem: $(docker exec "${node}" sh -c 'test -d /sys/module/sch_netem && echo loaded || echo "not loaded"')"
+    fi
+}
+
 cmd_collect() {
     local cluster=${1:?cluster} dir=${2:?dir} ctx node pod
     ctx="k3d-${cluster}"
@@ -116,12 +151,22 @@ cmd_collect() {
     done
 
     # Node containers: mountinfo (globalmount/pod mount state) and k3s logs.
-    for node in $(docker ps -a --filter "label=k3d.cluster=${cluster}" --format '{{.Names}}'); do
+    for node in $(cluster_nodes "${cluster}"); do
         docker exec "${node}" cat /proc/self/mountinfo >"${dir}/nodes/${node}.mountinfo" 2>&1
         docker exec "${node}" sh -c 'grep -E " - (cifs|smb3) " /proc/self/mountinfo' \
             >"${dir}/nodes/${node}.cifs-mounts" 2>&1
         docker logs --timestamps "${node}" >"${dir}/nodes/${node}.k3s.log" 2>&1
     done
+
+    # Host kernel state (shared by all node containers): the kernel log and the
+    # CIFS client's sessions, tree connects, in-flight requests and credits.
+    node=$(cluster_nodes "${cluster}" | grep -- '-server-0$' | head -n1 || true)
+    if [ -n "${node}" ]; then
+        docker exec "${node}" sh -c 'dmesg -T 2>/dev/null || dmesg' >"${dir}/dmesg.txt" 2>&1
+        docker exec "${node}" cat /proc/fs/cifs/DebugData >"${dir}/cifs-DebugData.txt" 2>&1
+        docker exec "${node}" cat /proc/fs/cifs/Stats >"${dir}/cifs-Stats.txt" 2>&1
+    fi
+    cmd_info "${cluster}" >"${dir}/runner-info.txt" 2>&1
     set -e
     echo "collected diagnostics into ${dir}"
 }
@@ -146,7 +191,9 @@ shift || true
 case "${sub}" in
     connect)    cmd_connect "$@" ;;
     kubeconfig) cmd_kubeconfig "$@" ;;
+    pin)        cmd_pin "$@" ;;
+    info)       cmd_info "$@" ;;
     collect)    cmd_collect "$@" ;;
     cleanup)    cmd_cleanup "$@" ;;
-    *) echo "usage: $0 {connect|kubeconfig|collect|cleanup} <cluster> [dir]" >&2; exit 2 ;;
+    *) echo "usage: $0 {connect|kubeconfig|pin|info|collect|cleanup} <cluster> [dir]" >&2; exit 2 ;;
 esac
