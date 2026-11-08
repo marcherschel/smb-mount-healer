@@ -183,6 +183,9 @@ jobs:
   sign:
     name: Sign image
     needs: publish
+    # An explicit condition: without it the job inherits the skip of `ci`
+    # (tests skipped on purpose) through `publish` and never runs.
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
