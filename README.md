@@ -83,8 +83,13 @@ All state lives in custom resources, so you can follow every step with
 
 ## Quick start
 
-The chart is published at `oci://ghcr.io/marcherschel/charts/smb-mount-healer`
-and listed on
+Using Flux? Follow the
+[Flux quick start](production/smb-mount-healer/README.md#quick-start-with-flux)
+instead: a namespace, an OCI `HelmRepository` and a `HelmRelease`, with notes
+on non-default csi-driver-smb installs and kubelet paths.
+
+With plain Helm: the chart is published at
+`oci://ghcr.io/marcherschel/charts/smb-mount-healer` and listed on
 [Artifact Hub](https://artifacthub.io/packages/helm/smb-mount-healer/smb-mount-healer).
 
 Create the namespace and allow privileged pods in it:
