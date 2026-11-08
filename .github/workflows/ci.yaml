@@ -1,9 +1,10 @@
 name: ci
 
+# No run on pushes to main: changes only reach main through PRs (main
+# ruleset), and the PR run is the trust boundary; validating the merge again
+# would only repeat it.
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       cifs_diagnostic:
@@ -59,18 +60,14 @@ jobs:
         id: decide
         env:
           EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
         run: |
-          # Releases (tag pushes, also via workflow_call) and manual runs: full.
-          if [[ "$GITHUB_REF" == refs/tags/* || ( "$EVENT" != pull_request && "$EVENT" != push ) ]]; then
-            suite=full
-          elif [ "$EVENT" = pull_request ]; then
+          if [ "$EVENT" = pull_request ]; then
             # The PR checkout is the merge commit; its first parent is the base.
             suite=$(git diff --name-only HEAD^1 HEAD | hack/ci-needs-run.sh)
-          elif [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
-            suite=full
           else
-            suite=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" | hack/ci-needs-run.sh)
+            # Releases (workflow_call from the tag-triggered release
+            # workflows) and manual runs always get the full suite.
+            suite=full
           fi
           echo "suite=${suite}" >> "$GITHUB_OUTPUT"
           echo "CI suite: ${suite}"
