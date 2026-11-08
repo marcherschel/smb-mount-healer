@@ -23,15 +23,15 @@ RUN mkdir -p /out
 
 # kubectl (sha256 from dl.k8s.io)
 RUN : "${KUBECTL_VERSION:?build-arg KUBECTL_VERSION is required}"; \
-    curl -fsSLo kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl"; \
-    echo "$(curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl.sha256")  kubectl" | sha256sum --check; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSLo kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl"; \
+    echo "$(curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl.sha256")  kubectl" | sha256sum --check; \
     install -m 0755 kubectl /out/kubectl
 
 # helm (sha256sum file from get.helm.sh)
 RUN : "${HELM_VERSION:?build-arg HELM_VERSION is required}"; \
     name="helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz"; \
-    curl -fsSLO "https://get.helm.sh/${name}"; \
-    curl -fsSL "https://get.helm.sh/${name}.sha256sum" | sha256sum --check; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSLO "https://get.helm.sh/${name}"; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "https://get.helm.sh/${name}.sha256sum" | sha256sum --check; \
     tar -xzf "${name}" "linux-${TARGETARCH}/helm"; \
     install -m 0755 "linux-${TARGETARCH}/helm" /out/helm
 
@@ -39,8 +39,8 @@ RUN : "${HELM_VERSION:?build-arg HELM_VERSION is required}"; \
 RUN : "${K3D_VERSION:?build-arg K3D_VERSION is required}"; \
     name="k3d-linux-${TARGETARCH}"; \
     base="https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}"; \
-    curl -fsSLO "${base}/${name}"; \
-    curl -fsSL "${base}/checksums.txt" -o k3d-checksums.txt; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSLO "${base}/${name}"; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "${base}/checksums.txt" -o k3d-checksums.txt; \
     expected=$(awk -v f="${name}" '{n=$2; sub(/^\*?(_dist\/)?/, "", n)} n == f {print $1}' k3d-checksums.txt); \
     [ -n "${expected}" ]; echo "${expected}  ${name}" | sha256sum --check; \
     install -m 0755 "${name}" /out/k3d
@@ -50,8 +50,8 @@ RUN : "${TILT_VERSION:?build-arg TILT_VERSION is required}"; \
     case "${TARGETARCH}" in amd64) arch=x86_64 ;; arm64) arch=arm64 ;; *) echo "unsupported ${TARGETARCH}"; exit 1 ;; esac; \
     name="tilt.${TILT_VERSION#v}.linux.${arch}.tar.gz"; \
     base="https://github.com/tilt-dev/tilt/releases/download/${TILT_VERSION}"; \
-    curl -fsSLO "${base}/${name}"; \
-    curl -fsSL "${base}/checksums.txt" -o tilt-checksums.txt; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSLO "${base}/${name}"; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "${base}/checksums.txt" -o tilt-checksums.txt; \
     grep -E "  ${name}\$" tilt-checksums.txt | sha256sum --check; \
     tar -xzf "${name}" tilt; \
     install -m 0755 tilt /out/tilt
@@ -60,8 +60,8 @@ RUN : "${TILT_VERSION:?build-arg TILT_VERSION is required}"; \
 RUN : "${GOLANGCI_LINT_VERSION:?build-arg GOLANGCI_LINT_VERSION is required}"; \
     name="golangci-lint-${GOLANGCI_LINT_VERSION#v}-linux-${TARGETARCH}"; \
     base="https://github.com/golangci/golangci-lint/releases/download/${GOLANGCI_LINT_VERSION}"; \
-    curl -fsSLO "${base}/${name}.tar.gz"; \
-    curl -fsSL "${base}/golangci-lint-${GOLANGCI_LINT_VERSION#v}-checksums.txt" -o golangci-checksums.txt; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSLO "${base}/${name}.tar.gz"; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "${base}/golangci-lint-${GOLANGCI_LINT_VERSION#v}-checksums.txt" -o golangci-checksums.txt; \
     grep -E "  ${name}\.tar\.gz\$" golangci-checksums.txt | sha256sum --check; \
     tar -xzf "${name}.tar.gz" "${name}/golangci-lint"; \
     install -m 0755 "${name}/golangci-lint" /out/golangci-lint
@@ -70,9 +70,9 @@ RUN : "${GOLANGCI_LINT_VERSION:?build-arg GOLANGCI_LINT_VERSION is required}"; \
 RUN : "${YQ_VERSION:?build-arg YQ_VERSION is required}"; \
     name="yq_linux_${TARGETARCH}"; \
     base="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}"; \
-    curl -fsSLO "${base}/${name}"; \
-    curl -fsSL "${base}/checksums" -o yq-checksums; \
-    idx=$(curl -fsSL "${base}/checksums_hashes_order" | grep -nx 'SHA-256' | cut -d: -f1); \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSLO "${base}/${name}"; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "${base}/checksums" -o yq-checksums; \
+    idx=$(curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "${base}/checksums_hashes_order" | grep -nx 'SHA-256' | cut -d: -f1); \
     expected=$(awk -v f="${name}" -v c="$((idx + 1))" '$1 == f {print $c}' yq-checksums); \
     [ -n "${expected}" ]; echo "${expected}  ${name}" | sha256sum --check; \
     install -m 0755 "${name}" /out/yq
@@ -81,8 +81,8 @@ RUN : "${YQ_VERSION:?build-arg YQ_VERSION is required}"; \
 RUN : "${ORAS_VERSION:?build-arg ORAS_VERSION is required}"; \
     v="${ORAS_VERSION#v}"; name="oras_${v}_linux_${TARGETARCH}.tar.gz"; \
     base="https://github.com/oras-project/oras/releases/download/${ORAS_VERSION}"; \
-    curl -fsSLO "${base}/${name}"; \
-    curl -fsSL "${base}/oras_${v}_checksums.txt" -o oras-checksums.txt; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSLO "${base}/${name}"; \
+    curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "${base}/oras_${v}_checksums.txt" -o oras-checksums.txt; \
     grep -E "  ${name}\$" oras-checksums.txt | sha256sum --check; \
     tar -xzf "${name}" oras; \
     install -m 0755 oras /out/oras
