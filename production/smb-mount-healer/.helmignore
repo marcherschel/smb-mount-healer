@@ -12,3 +12,5 @@
 # chart-testing value files and helm-docs template are not part of the package
 ci/
 README.md.gotmpl
+# ArtifactHub repository metadata (pushed separately by release-chart.yaml)
+artifacthub-repo.yml
