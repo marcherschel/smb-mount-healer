@@ -117,6 +117,8 @@ jobs:
         - /var/run/docker.sock:/var/run/docker.sock
     env:
       IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/smb-mount-healer
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -160,15 +162,6 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-      # Keyless signature (GitHub OIDC -> Sigstore) attached to the image in
-      # GHCR; verify with cosign verify --certificate-identity-regexp ... .
-      - name: Sign the image (cosign, keyless)
-        env:
-          DIGEST: ${{ steps.push.outputs.digest }}
-        run: cosign sign --yes "${IMAGE_REPO}@${DIGEST}"
-
       - name: Build release binaries (make dist-app)
         env:
           VERSION: ${{ needs.plan.outputs.version }}
@@ -184,10 +177,32 @@ jobs:
           path: dist/app/
           if-no-files-found: error
 
+  # cosign-installer needs envsubst, which the CI image lacks: sign on the
+  # plain runner. Keyless signature (GitHub OIDC -> Sigstore) attached to the
+  # image in GHCR.
+  sign:
+    name: Sign image
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # keyless cosign signature
+    steps:
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign the image (cosign, keyless)
+        env:
+          REF: ghcr.io/${{ github.repository_owner }}/smb-mount-healer@${{ needs.publish.outputs.digest }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cosign sign --yes "$REF"
+
   github-release:
     name: GitHub release
-    needs: [plan, publish]
-    if: ${{ !cancelled() && needs.publish.result == 'success' }}
+    needs: [plan, publish, sign]
+    if: ${{ !cancelled() && needs.publish.result == 'success' && needs.sign.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

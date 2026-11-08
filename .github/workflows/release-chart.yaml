@@ -81,11 +81,11 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write # keyless cosign signature
     container:
       image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
     outputs:
       version: ${{ steps.check.outputs.version }}
+      digest: ${{ steps.push.outputs.digest }}
     env:
       IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/smb-mount-healer
       CHART_REPO: ghcr.io/${{ github.repository_owner }}/charts
@@ -141,18 +141,6 @@ jobs:
           fi
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-      # Keyless signature (GitHub OIDC -> Sigstore) attached to the chart in
-      # GHCR. ArtifactHub shows OCI charts with a cosign signature as signed.
-      - name: Sign the chart (cosign, keyless)
-        env:
-          DIGEST: ${{ steps.push.outputs.digest }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          printf '%s' "$GHCR_TOKEN" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
-          cosign sign --yes "${CHART_REPO}/smb-mount-healer@${DIGEST}"
-
       # ArtifactHub reads repository metadata (verified publisher, owners) from
       # the special tag artifacthub.io next to the chart.
       - name: Push ArtifactHub repository metadata
@@ -168,9 +156,32 @@ jobs:
           path: dist/chart/
           if-no-files-found: error
 
+  # cosign-installer needs envsubst, which the CI image lacks: sign on the
+  # plain runner. Keyless signature (GitHub OIDC -> Sigstore) attached to the
+  # chart in GHCR; ArtifactHub shows OCI charts with a cosign signature as
+  # signed.
+  sign:
+    name: Sign chart
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # keyless cosign signature
+    steps:
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign the chart (cosign, keyless)
+        env:
+          REF: ghcr.io/${{ github.repository_owner }}/charts/smb-mount-healer@${{ needs.publish.outputs.digest }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cosign sign --yes "$REF"
+
   github-release:
     name: GitHub release
-    needs: publish
+    needs: [publish, sign]
     runs-on: ubuntu-latest
     permissions:
       contents: write
