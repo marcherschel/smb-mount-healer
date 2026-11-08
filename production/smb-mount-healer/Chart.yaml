@@ -7,8 +7,8 @@ name: smb-mount-healer
 # `appVersion` is the app release (tag v<appVersion>) the chart deploys by
 # default; Renovate bumps it, the artifacthub.io/images tag and the chart
 # version together after each app release.
-version: 0.1.3
-appVersion: "0.1.0"
+version: 0.1.4
+appVersion: "0.1.1"
 kubeVersion: ">=1.31.0-0"
 description: "Kubernetes operator that detects and heals broken SMB/CIFS CSI mounts (csi-driver-smb): per-node worker probes, leader-elected control plane remediation with dry-run mode, and quarantine of data written to dead mounts."
 home: https://github.com/marcherschel/smb-mount-healer
@@ -31,7 +31,7 @@ annotations:
   artifacthub.io/prerelease: "false"
   artifacthub.io/images: |
     - name: smb-mount-healer
-      image: ghcr.io/marcherschel/smb-mount-healer:0.1.0
+      image: ghcr.io/marcherschel/smb-mount-healer:0.1.1
   artifacthub.io/links: |
     - name: Source
       url: https://github.com/marcherschel/smb-mount-healer
@@ -49,12 +49,10 @@ annotations:
     - title: Grafana dashboard (monitoring.grafanaDashboard)
       url: https://raw.githubusercontent.com/marcherschel/smb-mount-healer/main/docs/demo/grafana-dashboard.png
   artifacthub.io/changes: |
-    - kind: added
-      description: Chart icon.
-    - kind: added
-      description: The chart is signed with cosign (keyless, GitHub Actions OIDC); 0.1.2 was published without signature and release.
     - kind: changed
-      description: Stable release; no longer marked as a prerelease (the API is still v1alpha1).
+      description: Default image ghcr.io/marcherschel/smb-mount-healer:0.1.1, signed with cosign and attested.
+    - kind: changed
+      description: The README installs without dry run from day one; dry run stays optional for trying it out.
   artifacthub.io/crds: |
     - kind: SmbMount
       version: v1alpha1
