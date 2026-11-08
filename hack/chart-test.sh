@@ -30,7 +30,7 @@ PROMETHEUSRULE_API=monitoring.coreos.com/v1/PrometheusRule
 # promtool validates the alerting rules (monitoring/alerts, rendered PrometheusRule).
 # https://hub.docker.com/r/prom/prometheus/tags
 # renovate: datasource=docker depName=prom/prometheus
-PROMTOOL_IMAGE=prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+PROMTOOL_IMAGE=prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
 PROMTOOL=${PROMTOOL:-docker run --rm -i --entrypoint /bin/promtool $PROMTOOL_IMAGE}
 RELEASE=smb-mount-healer
 NS=test-ns
