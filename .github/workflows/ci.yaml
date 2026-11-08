@@ -39,8 +39,46 @@ defaults:
     shell: bash
 
 jobs:
+  # Decides how much of the suite a change needs (hack/ci-needs-run.sh):
+  #   full  lint, unit/envtest, e2e
+  #   chart lint only (the change is limited to the chart and monitoring/)
+  #   none  nothing (Markdown, workflows other than this one, octo-sts policies)
+  # Skipped jobs satisfy the required checks of the main ruleset;
+  # paths-ignore on the trigger would leave them pending forever instead.
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      suite: ${{ steps.decide.outputs.suite }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Decide
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # Releases (tag pushes, also via workflow_call) and manual runs: full.
+          if [[ "$GITHUB_REF" == refs/tags/* || ( "$EVENT" != pull_request && "$EVENT" != push ) ]]; then
+            suite=full
+          elif [ "$EVENT" = pull_request ]; then
+            # The PR checkout is the merge commit; its first parent is the base.
+            suite=$(git diff --name-only HEAD^1 HEAD | hack/ci-needs-run.sh)
+          elif [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+            suite=full
+          else
+            suite=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" | hack/ci-needs-run.sh)
+          fi
+          echo "suite=${suite}" >> "$GITHUB_OUTPUT"
+          echo "CI suite: ${suite}"
+
   lint:
     name: Lint + generated files
+    needs: changes
+    if: needs.changes.outputs.suite != 'none'
     runs-on: ubuntu-latest
     container:
       # CI toolbox built from .github/ci-image (workflow ci-image.yaml).
@@ -98,8 +136,16 @@ jobs:
       - name: Helm chart lint + test
         run: make chart-lint chart-test
 
+      # values.yaml defaults == the binary's defaults (internal/config). Also
+      # part of the unit tests, repeated here because chart-only changes skip
+      # the unit job.
+      - name: Chart defaults match the binary
+        run: go test ./production/...
+
   unit:
     name: Unit + envtest
+    needs: changes
+    if: needs.changes.outputs.suite == 'full'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7

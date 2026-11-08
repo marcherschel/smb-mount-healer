@@ -3,7 +3,11 @@
 # with these permissions (https://github.com/octo-sts/app). Needs the octo-sts
 # GitHub App installed on this repository.
 issuer: https://token.actions.githubusercontent.com
-subject: repo:marcherschel/smb-mount-healer:ref:refs/heads/main
+# GitHub issues new repositories an OIDC subject with immutable owner and
+# repository IDs (repo:marcherschel@22261092/smb-mount-healer@1450273737:ref:...);
+# accept that and the classic form. The pinned IDs keep a renamed or
+# re-created repository of the same name from matching.
+subject_pattern: repo:marcherschel(@22261092)?/smb-mount-healer(@1450273737)?:ref:refs/heads/main
 claim_pattern:
   job_workflow_ref: marcherschel/smb-mount-healer/\.github/workflows/renovate\.yaml@refs/heads/main
 
