@@ -8,17 +8,32 @@ name: release-app
 #   CRDs of this API version, SHA256SUMS.
 # The chart is released separately (tags chart-v*, release-chart.yaml); after
 # this release Renovate opens the PR that moves the chart's appVersion here.
-# The full CI suite (lint, unit, envtest, e2e) gates every publish step.
+# The full CI suite (lint, unit, envtest, e2e) gates every publish step,
+# unless the tests are skipped on purpose:
+#   - an annotated tag whose message contains "[skip tests]"
+#     (git tag -a v0.1.0 -m "smb-mount-healer v0.1.0 [skip tests]"), or
+#   - a manual run (workflow_dispatch) for an existing tag with skip_tests.
+# A manual run also re-releases a tag whose tag-triggered run failed.
 
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing app tag to release (vX.Y.Z or vX.Y.Z-rc.N)"
+        type: string
+        required: true
+      skip_tests:
+        description: "Publish without running the CI suite first"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-app-${{ github.ref }}
+  group: release-app-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -31,15 +46,65 @@ defaults:
     shell: bash
 
 jobs:
+  # Which tag, which version, and whether the CI suite runs first.
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      skip_tests: ${{ steps.plan.outputs.skip_tests }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tags and their annotations
+
+      - name: Plan
+        id: plan
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_SKIP: ${{ inputs.skip_tests }}
+        run: |
+          tag=${INPUT_TAG:-$GITHUB_REF_NAME}
+          version=${tag#v}
+          if [[ "$tag" != v* || ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::tag ${tag} is not vX.Y.Z[-pre]"
+            exit 1
+          fi
+          git rev-parse -q --verify "refs/tags/${tag}" >/dev/null || { echo "::error::tag ${tag} does not exist"; exit 1; }
+          skip=false
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            [ "$INPUT_SKIP" = true ] && skip=true
+          elif git tag -l --format='%(contents)' "$tag" | grep -qiF '[skip tests]'; then
+            skip=true
+          fi
+          if [ "$skip" = true ]; then
+            echo "::warning::publishing ${tag} WITHOUT running the CI suite"
+          fi
+          {
+            echo "tag=${tag}"
+            echo "version=${version}"
+            echo "skip_tests=${skip}"
+          } >> "$GITHUB_OUTPUT"
+          echo "release ${tag} (version ${version}), skip tests: ${skip}"
+
   ci:
+    needs: plan
+    if: needs.plan.outputs.skip_tests != 'true'
     uses: ./.github/workflows/ci.yaml
+    with:
+      ref: refs/tags/${{ needs.plan.outputs.tag }}
     permissions:
       contents: read
       packages: read # pull the CI image from GHCR
 
   publish:
     name: Image + binaries
-    needs: ci
+    needs: [plan, ci]
+    # Runs after a green CI suite, or when the tests were skipped on purpose.
+    if: >-
+      ${{ !cancelled() && needs.plan.result == 'success' &&
+        (needs.ci.result == 'success' || (needs.ci.result == 'skipped' && needs.plan.outputs.skip_tests == 'true')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -54,22 +119,12 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     env:
       IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/smb-mount-healer
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Version from tag
-        id: version
-        run: |
-          version=${GITHUB_REF_NAME#v}
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::tag ${GITHUB_REF_NAME} is not vX.Y.Z[-pre]"
-            exit 1
-          fi
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
+        with:
+          ref: refs/tags/${{ needs.plan.outputs.tag }}
 
       # The final apt layer of the image runs under the target platform.
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
@@ -85,7 +140,7 @@ jobs:
       - name: Build and push linux/amd64 + linux/arm64
         id: push
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
           metadata="${RUNNER_TEMP}/image-metadata.json"
           make image \
@@ -111,7 +166,7 @@ jobs:
 
       - name: Build release binaries (make dist-app)
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.plan.outputs.version }}
         run: make dist-app VERSION="$VERSION"
 
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -126,13 +181,15 @@ jobs:
 
   github-release:
     name: GitHub release
-    needs: publish
+    needs: [plan, publish]
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: refs/tags/${{ needs.plan.outputs.tag }}
           fetch-depth: 0 # previous app tag for the release notes
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -143,11 +200,18 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.publish.outputs.version }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          SKIPPED: ${{ needs.plan.outputs.skip_tests }}
         run: |
           flags=(--generate-notes --verify-tag)
+          if [ "$SKIPPED" = true ]; then
+            notes="${RUNNER_TEMP}/notes.md"
+            echo "> Published without running the CI suite (tests skipped on purpose)." >"$notes"
+            flags+=(--notes-file "$notes")
+          fi
           # Notes since the previous app release, never since a chart-v* tag.
-          previous=$(git -c versionsort.suffix=- tag -l 'v[0-9]*' --sort=-v:refname | grep -vx "$GITHUB_REF_NAME" | head -1 || true)
+          previous=$(git -c versionsort.suffix=- tag -l 'v[0-9]*' --sort=-v:refname | grep -vx "$TAG" | head -1 || true)
           if [ -n "$previous" ]; then
             flags+=(--notes-start-tag "$previous")
           fi
@@ -155,5 +219,5 @@ jobs:
           if [[ "$VERSION" == 0.* || "$VERSION" == *-* ]]; then
             flags+=(--prerelease)
           fi
-          gh release create "$GITHUB_REF_NAME" dist/app/* --repo "$GITHUB_REPOSITORY" \
-            --title "smb-mount-healer $GITHUB_REF_NAME" "${flags[@]}"
+          gh release create "$TAG" dist/app/* --repo "$GITHUB_REPOSITORY" \
+            --title "smb-mount-healer $TAG" "${flags[@]}"

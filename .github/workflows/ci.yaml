@@ -13,6 +13,11 @@ on:
         default: false
   # The release workflow runs the full suite before it publishes anything.
   workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to test (default: the commit that triggered the caller, e.g. the pushed tag)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -54,6 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Decide
@@ -90,6 +96,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref }}
           fetch-depth: 0 # tags for hack/check-chart-version.sh
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -152,6 +159,8 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Read versions
         id: versions
@@ -207,6 +216,8 @@ jobs:
       SMBMH_E2E_IMAGE_MODE: k3d-import
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
