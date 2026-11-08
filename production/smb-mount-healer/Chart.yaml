@@ -7,7 +7,7 @@ name: smb-mount-healer
 # `appVersion` is the app release (tag v<appVersion>) the chart deploys by
 # default; Renovate bumps it, the artifacthub.io/images tag and the chart
 # version together after each app release.
-version: 0.1.2
+version: 0.1.3
 appVersion: "0.1.0"
 kubeVersion: ">=1.31.0-0"
 description: "Kubernetes operator that detects and heals broken SMB/CIFS CSI mounts (csi-driver-smb): per-node worker probes, leader-elected control plane remediation with dry-run mode, and quarantine of data written to dead mounts."
@@ -52,7 +52,7 @@ annotations:
     - kind: added
       description: Chart icon.
     - kind: added
-      description: The chart and the image are signed with cosign (keyless, GitHub Actions OIDC).
+      description: The chart is signed with cosign (keyless, GitHub Actions OIDC); 0.1.2 was published without signature and release.
     - kind: changed
       description: Stable release; no longer marked as a prerelease (the API is still v1alpha1).
   artifacthub.io/crds: |
