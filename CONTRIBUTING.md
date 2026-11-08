@@ -14,7 +14,7 @@ make test test-envtest
 make chart-lint chart-test
 ```
 
-CI runs the same checks plus the e2e suite (`make e2e`). How much of it runs depends on
+CI runs the same checks plus the e2e suite (`make e2e`) on every pull request and before every release; it does not run again after the merge to `main`. How much of it runs depends on
 the change (`hack/ci-needs-run.sh`; skipped checks count as passed): only
 Markdown or workflows other than `ci.yaml` run nothing, changes limited to
 the chart (`production/smb-mount-healer/`, `monitoring/`) run only the lint
