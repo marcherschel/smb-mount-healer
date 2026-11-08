@@ -99,28 +99,26 @@ kubectl create namespace smb-mount-healer-system
 kubectl label namespace smb-mount-healer-system pod-security.kubernetes.io/enforce=privileged
 ```
 
-Install in **dry-run mode** first. The healer then detects problems and plans
-remediations, but doesn't scale, unmount or move anything:
+Install it. The healer heals from day one; its safety model (below) keeps
+every action bounded, reversible and free of data loss:
 
 ```sh
 helm install smb-mount-healer oci://ghcr.io/marcherschel/charts/smb-mount-healer \
-  -n smb-mount-healer-system --set dryRun=true
+  -n smb-mount-healer-system
 ```
 
-Then watch what it sees and what it would do:
+See what it sees:
 
 ```sh
 kubectl get smbmounts                # health of every SMB volume on every node
-kubectl get smbr -o wide             # remediations; dry-run episodes end with OUTCOME dry_run
-kubectl get smbt -o yaml             # the host actions it would have run
+kubectl get smbr -o wide             # remediations and their outcome
 ```
 
-When you trust it, switch dry run off:
-
-```sh
-helm upgrade smb-mount-healer oci://ghcr.io/marcherschel/charts/smb-mount-healer \
-  -n smb-mount-healer-system --reuse-values --set dryRun=false
-```
+Want to try it out first? Add `--set dryRun=true`: the healer then detects
+problems and plans remediations, but doesn't scale, unmount or move anything
+(episodes end with outcome `dry_run`, and `kubectl get smbt -o yaml` shows
+the host actions it would have run). Switch it off later with
+`helm upgrade ... --reuse-values --set dryRun=false`.
 
 All chart values are documented in the
 [chart README](production/smb-mount-healer/README.md).
