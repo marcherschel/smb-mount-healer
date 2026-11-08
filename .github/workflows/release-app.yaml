@@ -160,6 +160,15 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      # Keyless signature (GitHub OIDC -> Sigstore) attached to the image in
+      # GHCR; verify with cosign verify --certificate-identity-regexp ... .
+      - name: Sign the image (cosign, keyless)
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "${IMAGE_REPO}@${DIGEST}"
+
       - name: Build release binaries (make dist-app)
         env:
           VERSION: ${{ needs.plan.outputs.version }}
@@ -211,9 +220,12 @@ jobs:
           if [ -n "$previous" ]; then
             flags+=(--notes-start-tag "$previous")
           fi
-          # 0.x and -rc/-beta tags are prereleases (API v1alpha1).
-          if [[ "$VERSION" == 0.* || "$VERSION" == *-* ]]; then
-            flags+=(--prerelease)
+          # Only -rc/-beta/... tags are prereleases. App releases are the
+          # repository's "Latest" release (binaries, CRDs); chart releases never are.
+          if [[ "$VERSION" == *-* ]]; then
+            flags+=(--prerelease --latest=false)
+          else
+            flags+=(--latest)
           fi
           gh release create "$TAG" dist/app/* --repo "$GITHUB_REPOSITORY" \
             --title "smb-mount-healer $TAG" "${flags[@]}"

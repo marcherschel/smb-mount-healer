@@ -10,11 +10,12 @@
 #          in the chart (production/smb-mount-healer/) or its monitoring
 #          sources (monitoring/)
 #   none   nothing: only Markdown (except docs/state-machine.md, which CI checks
-#          for drift against the code), workflows other than ci.yaml, or the
-#          octo-sts trust policies under .github/chainguard/
+#          for drift against the code), images and demo media (docs/demo/,
+#          *.png/.gif/.svg/.mp4), workflows other than ci.yaml, or the octo-sts
+#          trust policies under .github/chainguard/
 set -euo pipefail
 
-ignored='(\.md$)|(^\.github/workflows/(renovate|release-app|release-chart|ci-image)\.yaml$)|(^\.github/chainguard/)'
+ignored='(\.md$)|(\.(png|gif|svg|mp4)$)|(^docs/demo/)|(^\.github/workflows/(renovate|release-app|release-chart|ci-image)\.yaml$)|(^\.github/chainguard/)'
 chart='^(production/smb-mount-healer/|monitoring/)'
 always='^docs/state-machine\.md$'
 
