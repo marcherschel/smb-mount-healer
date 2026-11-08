@@ -16,7 +16,7 @@ make chart-lint chart-test
 
 CI runs the same checks plus the e2e suite (`make e2e`) on every pull request and before every release; it does not run again after the merge to `main`. How much of it runs depends on
 the change (`hack/ci-needs-run.sh`; skipped checks count as passed): only
-Markdown or workflows other than `ci.yaml` run nothing, changes limited to
+Markdown, images/demo media or workflows other than `ci.yaml` run nothing, changes limited to
 the chart (`production/smb-mount-healer/`, `monitoring/`) run only the lint
 job (chart lint/test, generated files, chart version, chart defaults), and
 everything else runs the full suite. You can run e2e
@@ -41,9 +41,13 @@ different tags in this repository:
 | Publishes | `ghcr.io/marcherschel/smb-mount-healer:X.Y.Z`; GitHub release with static binaries, CRDs, `SHA256SUMS` (`make dist-app`) | `oci://ghcr.io/marcherschel/charts/smb-mount-healer` A.B.C; GitHub release with chart package, dashboard, rules, PrometheusRule, `SHA256SUMS` (`make dist-chart`) |
 
 The app release runs the full CI suite first (unless skipped, see below);
-the chart release runs only the chart checks. `0.x` and `-rc` versions are
-marked as prereleases. Both workflows can be started by hand for an
-existing tag (input `tag`) to release it again.
+the chart release runs only the chart checks. Only versions with a
+pre-release suffix (`-rc.1`, ...) are marked as prereleases. App releases
+become the repository's "Latest" release on GitHub (they carry the binaries
+and CRDs); chart releases never do, since the chart is installed from the
+OCI registry. Both workflows sign what they publish with cosign (keyless,
+GitHub OIDC). Both can be started by hand for an existing tag (input `tag`)
+to release it again.
 
 ### App release
 

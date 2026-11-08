@@ -1,8 +1,18 @@
 # smb-mount-healer
 
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/smb-mount-healer)](https://artifacthub.io/packages/search?repo=smb-mount-healer)
+[![Release](https://img.shields.io/github/v/release/marcherschel/smb-mount-healer?label=release)](https://github.com/marcherschel/smb-mount-healer/releases/latest)
+[![License](https://img.shields.io/github/license/marcherschel/smb-mount-healer)](LICENSE)
+[![Go](https://img.shields.io/github/go-mod/go-version/marcherschel/smb-mount-healer)](go.mod)
+
 A Kubernetes operator that detects broken SMB/CIFS volumes of
 [csi-driver-smb](https://github.com/kubernetes-csi/csi-driver-smb) and heals
 them, without losing the data your pods wrote while the mount was dead.
+
+**Getting started:** the easiest way is the Helm chart on
+[Artifact Hub](https://artifacthub.io/packages/helm/smb-mount-healer/smb-mount-healer),
+which has the install command, all values and the custom resources. Then
+follow the [quick start](#quick-start) below.
 
 ![smb-mount-healer healing a dead SMB mount](docs/demo/smb-mount-healer-realistic.gif)
 
@@ -72,6 +82,10 @@ All state lives in custom resources, so you can follow every step with
   bare pods; it only reports them (outcome `skipped_no_owner`).
 
 ## Quick start
+
+The chart is published at `oci://ghcr.io/marcherschel/charts/smb-mount-healer`
+and listed on
+[Artifact Hub](https://artifacthub.io/packages/helm/smb-mount-healer/smb-mount-healer).
 
 Create the namespace and allow privileged pods in it:
 
@@ -194,8 +208,8 @@ kubectl delete crd smbmounts.smbhealer.herschel.io smbmountremediations.smbheale
 
 ## Status
 
-The API is `v1alpha1` and releases are `0.x` prereleases, so fields may
-change between minor versions. Every change is tested by unit tests, envtest,
+The API is `v1alpha1` and releases are `0.x`, so fields may change between
+minor versions. Every change is tested by unit tests, envtest,
 a deterministic simulator, and an end-to-end suite that breaks real CIFS
 mounts on a k3d cluster.
 
