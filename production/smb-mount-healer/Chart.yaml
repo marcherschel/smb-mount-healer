@@ -7,7 +7,7 @@ name: smb-mount-healer
 # `appVersion` is the app release (tag v<appVersion>) the chart deploys by
 # default; Renovate bumps it, the artifacthub.io/images tag and the chart
 # version together after each app release.
-version: 0.1.0
+version: 0.1.1
 appVersion: "0.1.0"
 kubeVersion: ">=1.31.0-0"
 description: "Kubernetes operator that detects and heals broken SMB/CIFS CSI mounts (csi-driver-smb): per-node worker probes, leader-elected control plane remediation with dry-run mode, and quarantine of data written to dead mounts."
@@ -25,6 +25,8 @@ maintainers:
     url: https://github.com/marcherschel
 annotations:
   artifacthub.io/license: GPL-2.0-only
+  artifacthub.io/category: storage
+  artifacthub.io/operator: "true"
   artifacthub.io/prerelease: "true"
   artifacthub.io/images: |
     - name: smb-mount-healer
@@ -36,11 +38,20 @@ annotations:
       url: https://github.com/marcherschel/smb-mount-healer/tree/main/docs/runbooks
     - name: Design
       url: https://github.com/marcherschel/smb-mount-healer/blob/main/docs/architecture.md
+    - name: support
+      url: https://github.com/marcherschel/smb-mount-healer/issues
+  artifacthub.io/recommendations: |
+    - url: https://artifacthub.io/packages/helm/csi-driver-smb/csi-driver-smb
+  artifacthub.io/screenshots: |
+    - title: A dead SMB mount is detected and healed
+      url: https://raw.githubusercontent.com/marcherschel/smb-mount-healer/main/docs/demo/smb-mount-healer-realistic.gif
+    - title: Grafana dashboard (monitoring.grafanaDashboard)
+      url: https://raw.githubusercontent.com/marcherschel/smb-mount-healer/main/docs/demo/grafana-dashboard.png
   artifacthub.io/changes: |
     - kind: added
-      description: Initial chart (control plane, worker, CRDs, RBAC, metrics, dry-run mode).
-    - kind: added
-      description: Optional Grafana dashboard ConfigMap (monitoring.grafanaDashboard) and PrometheusRule with the alerts (monitoring.prometheusRule).
+      description: ArtifactHub metadata (category, operator, support link, recommendation, screenshots).
+    - kind: fixed
+      description: Absolute LICENSE link in the chart README, so it resolves on ArtifactHub.
   artifacthub.io/crds: |
     - kind: SmbMount
       version: v1alpha1
