@@ -113,10 +113,6 @@ jobs:
       attestations: write
     container:
       image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
-      # Pulling the CI image needs credentials while its GHCR package is private.
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
     env:
