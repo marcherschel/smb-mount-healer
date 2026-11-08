@@ -35,24 +35,20 @@ kubectl label namespace smb-mount-healer-system \
   pod-security.kubernetes.io/warn=privileged
 ```
 
-Start in dry-run mode and watch what the healer would do:
+Install it. The healer heals from day one; its safety model (bounded,
+reversible, never deletes data) is designed for that:
 
 ```sh
 helm install smb-mount-healer oci://ghcr.io/marcherschel/charts/smb-mount-healer \
-  -n smb-mount-healer-system --set dryRun=true
+  -n smb-mount-healer-system
 helm test smb-mount-healer -n smb-mount-healer-system
 
 kubectl get smbm,smbr,smbq
-kubectl get smbr -o wide            # finished dry-run episodes show OUTCOME dry_run
-kubectl get smbt -o yaml            # every planned host action, result DryRun
 ```
 
-Then let it act:
-
-```sh
-helm upgrade smb-mount-healer oci://ghcr.io/marcherschel/charts/smb-mount-healer \
-  -n smb-mount-healer-system --reuse-values --set dryRun=false
-```
+Want to try it out first? Install with `--set dryRun=true` (see
+[Dry run](#dry-run)) and switch it off later with
+`helm upgrade ... --reuse-values --set dryRun=false`.
 
 Abort a running remediation (it moves to `rolling_back` and restores replicas):
 
@@ -62,7 +58,8 @@ kubectl annotate smbr <name> smbhealer.herschel.io/abort=true
 
 ## Quick start with Flux
 
-A minimal Flux setup that enforces right away (no dry run). It assumes
+A minimal Flux setup. Like the Helm install above it heals right away;
+set `dryRun: true` to try it out first. It assumes
 csi-driver-smb installed with its chart defaults (node DaemonSet
 `csi-smb-node` in `kube-system`) and the standard kubelet directory. The
 defaults were developed and tested against Talos Linux; any distribution with
@@ -123,7 +120,9 @@ spec:
 
 ## Dry run
 
-`dryRun: true` adds `--dry-run` to the control plane (and the annotation
+Optional: for trying the healer out before it acts, and as an emergency
+brake on a running installation. `dryRun: true` adds `--dry-run` to the
+control plane (and the annotation
 `smbhealer.herschel.io/dry-run: "true"`). Remediations then walk every stage
 and end with outcome `dry_run`; host tasks are created with `dryRun: true` and
 the worker only reports what it would do. Nothing is scaled, deleted,
