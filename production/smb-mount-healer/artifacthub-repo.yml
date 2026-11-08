@@ -1,0 +1,9 @@
+# ArtifactHub repository metadata for oci://ghcr.io/marcherschel/charts/smb-mount-healer.
+# release-chart.yaml pushes it next to the chart as
+# ghcr.io/marcherschel/charts/smb-mount-healer:artifacthub.io (oras).
+# Not part of the chart package (.helmignore).
+# https://github.com/artifacthub/hub/blob/master/docs/metadata/artifacthub-repo.yml
+repositoryID: 90843f62-d1d6-48cf-a98e-1b0e3d965fdf
+owners:
+  - name: Marc Herschel
+    email: marc@herschel.io
