@@ -14,9 +14,12 @@ make test test-envtest
 make chart-lint chart-test
 ```
 
-CI runs the same checks plus the e2e suite (`make e2e`). It skips them (they show as
-skipped, which counts as passed) when a change only touches Markdown or
-workflows other than `ci.yaml`; see `hack/ci-needs-run.sh`. You can run e2e
+CI runs the same checks plus the e2e suite (`make e2e`). How much of it runs depends on
+the change (`hack/ci-needs-run.sh`; skipped checks count as passed): only
+Markdown or workflows other than `ci.yaml` run nothing, changes limited to
+the chart (`production/smb-mount-healer/`, `monitoring/`) run only the lint
+job (chart lint/test, generated files, chart version, chart defaults), and
+everything else runs the full suite. You can run e2e
 locally on Linux if the machine running Docker has the `cifs` kernel module
 (`sudo modprobe cifs`); it takes about 25 minutes.
 

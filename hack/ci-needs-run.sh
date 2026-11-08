@@ -1,28 +1,37 @@
 #!/usr/bin/env bash
-# Reads changed file paths (one per line) on stdin and prints "true" if the CI
-# suite (lint, unit/envtest, e2e) has to run for them, "false" if every file
-# is irrelevant to it. Used by the `changes` job of .github/workflows/ci.yaml;
-# an empty list prints "true" (unknown diff: run everything).
+# Reads changed file paths (one per line) on stdin and prints how much of the
+# CI suite has to run for them. Used by the `changes` job of
+# .github/workflows/ci.yaml.
 #
-# Irrelevant to CI:
-#   - Markdown, except the generated files CI checks for drift
-#     (docs/state-machine.md, the chart README rendered by helm-docs);
-#   - workflows that are not ci.yaml (renovate, releases, CI image build) and
-#     the octo-sts trust policies under .github/chainguard/.
+#   full   lint, unit/envtest and e2e (any change not covered below; also an
+#          empty list, since an unknown diff runs everything)
+#   chart  only the lint job (chart lint/test, generated files, chart version
+#          guard, chart defaults vs binary defaults): every relevant change is
+#          in the chart (production/smb-mount-healer/) or its monitoring
+#          sources (monitoring/)
+#   none   nothing: only Markdown (except docs/state-machine.md, which CI checks
+#          for drift against the code), workflows other than ci.yaml, or the
+#          octo-sts trust policies under .github/chainguard/
 set -euo pipefail
 
 ignored='(\.md$)|(^\.github/workflows/(renovate|release-app|release-chart|ci-image)\.yaml$)|(^\.github/chainguard/)'
-generated='^(docs/state-machine\.md|production/smb-mount-healer/README\.md)$'
+chart='^(production/smb-mount-healer/|monitoring/)'
+always='^docs/state-machine\.md$'
 
 files=$(grep -v '^[[:space:]]*$' || true)
 if [ -z "$files" ]; then
-  echo true
+  echo full
   exit 0
 fi
-relevant=$(printf '%s\n' "$files" | grep -Ev "$ignored" || true)
-generated_md=$(printf '%s\n' "$files" | grep -E "$generated" || true)
-if [ -n "$relevant" ] || [ -n "$generated_md" ]; then
-  echo true
+# Chart files (including the generated chart README) never count as ignored.
+relevant=$(printf '%s\n' "$files" | grep -E "$chart|$always" || true)
+relevant+=$'\n'$(printf '%s\n' "$files" | grep -Ev "$chart|$always" | grep -Ev "$ignored" || true)
+relevant=$(printf '%s\n' "$relevant" | grep -v '^$' || true)
+
+if [ -z "$relevant" ]; then
+  echo none
+elif printf '%s\n' "$relevant" | grep -qvE "$chart"; then
+  echo full
 else
-  echo false
+  echo chart
 fi
