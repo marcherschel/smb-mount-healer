@@ -47,6 +47,12 @@ marked as prereleases.
 
 1. Tag the commit on `main`: `git tag -s v0.2.0 -m v0.2.0 && git push origin v0.2.0`
    (`v0.2.0-rc.1` for a release candidate).
+   To publish without running the CI suite first (the commit already
+   passed it in its PR), put `[skip tests]` into the tag message:
+   `git tag -s v0.2.0 -m "v0.2.0 [skip tests]"`. A manual run of
+   `release-app.yaml` (inputs `tag`, `skip_tests`) releases an existing tag
+   again, for example after a failed run. The GitHub release notes say
+   when the tests were skipped.
 2. Renovate then opens a PR that moves the chart's `appVersion` (and the
    `artifacthub.io/images` tag) to the new release, bumps the chart
    `version` by a patch and adds a `changed` entry to
