@@ -40,8 +40,10 @@ different tags in this repository:
 | Version source | the tag | `version` in `production/smb-mount-healer/Chart.yaml` (the tag must match) |
 | Publishes | `ghcr.io/marcherschel/smb-mount-healer:X.Y.Z`; GitHub release with static binaries, CRDs, `SHA256SUMS` (`make dist-app`) | `oci://ghcr.io/marcherschel/charts/smb-mount-healer` A.B.C; GitHub release with chart package, dashboard, rules, PrometheusRule, `SHA256SUMS` (`make dist-chart`) |
 
-Both workflows run the full CI suite first. `0.x` and `-rc` versions are
-marked as prereleases.
+The app release runs the full CI suite first (unless skipped, see below);
+the chart release runs only the chart checks. `0.x` and `-rc` versions are
+marked as prereleases. Both workflows can be started by hand for an
+existing tag (input `tag`) to release it again.
 
 ### App release
 
@@ -71,7 +73,9 @@ Every change below `production/smb-mount-healer/` needs a higher chart
    `artifacthub.io/containsSecurityUpdates: "true"` if the release fixes a
    vulnerability. Merge to `main`.
 2. Tag: `git tag -s chart-v0.2.0 -m chart-v0.2.0 && git push origin chart-v0.2.0`.
-3. The workflow refuses the tag if it differs from `Chart.yaml` `version`,
+3. The workflow runs the chart checks only (chart lint/test, dashboard and
+   alert metric names; the Go suite gates the app release, not the chart).
+   It refuses the tag if it differs from `Chart.yaml` `version`,
    if that version is already published, or if the image for `appVersion`
    does not exist.
 
