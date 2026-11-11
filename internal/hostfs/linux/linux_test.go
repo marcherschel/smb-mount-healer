@@ -179,6 +179,32 @@ func TestDirInspector(t *testing.T) {
 	}
 }
 
+// TestDirInspectorVanishesAfterListing: kubelet removes a pod volume dir
+// between the parent listing and the read of the dir itself (S5 in e2e:
+// quarantine failed with "read directory: no such file or directory").
+// Inspect must report it as missing, not fail.
+func TestDirInspectorVanishesAfterListing(t *testing.T) {
+	root := t.TempDir()
+	layout := kubelet.Layout{Root: root, DriverName: "smb.csi.k8s.io"}
+	d := DirInspector{Layout: layout, Mounts: &fake.MountTable{}}
+	path := layout.PodVolumeMountPath("uid-1", "pv-a")
+	mkdirs(t, path)
+
+	testHookBeforeRead = func(p string) {
+		if p == path {
+			if err := os.Remove(p); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	t.Cleanup(func() { testHookBeforeRead = nil })
+
+	got, err := d.Inspect(context.Background(), path)
+	if err != nil || got != (hostfs.DirFacts{}) {
+		t.Fatalf("Inspect = %+v, %v; want missing, no error", got, err)
+	}
+}
+
 func TestDirInspectorMissingRoot(t *testing.T) {
 	d := DirInspector{Layout: kubelet.Layout{Root: filepath.Join(t.TempDir(), "nope"), DriverName: "x"}, Mounts: &fake.MountTable{}}
 	pods, err1 := d.ListPodVolumeDirs(context.Background())

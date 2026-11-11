@@ -40,10 +40,13 @@ const (
 	// NameLabel selects fixture, samba and chaos pods.
 	NameLabel = "app.kubernetes.io/name"
 
-	CSIDriverName  = "smb.csi.k8s.io"
-	KubeletRoot    = "/var/lib/kubelet"
-	CSINodeLabel   = "app=csi-smb-node"
-	QuarantineRoot = KubeletRoot + "/smb-mount-healer-quarantine"
+	CSIDriverName = "smb.csi.k8s.io"
+	KubeletRoot   = "/var/lib/kubelet"
+	CSINodeLabel  = "app=csi-smb-node"
+	// CSINodeContainer is the plugin container of the csi-smb-node pod
+	// (NodeStage/NodeUnstage/NodePublish run there).
+	CSINodeContainer = "smb"
+	QuarantineRoot   = KubeletRoot + "/smb-mount-healer-quarantine"
 )
 
 // Default timeouts. Remediations walk a dozen stages with the shortened

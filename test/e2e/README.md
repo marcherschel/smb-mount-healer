@@ -244,7 +244,7 @@ breaks.
 | S9 | Co-tenant pinning | `DetachGlobalmount(library)` + `DeletePod(cotenant-b)` | `cotenant_test.go` |
 | S10 | Flux fighter | S9 + `EnableFighter("deployment/cotenant-a", 1)` | `cotenant_test.go` |
 | S11 | Two-volume pod | `DetachGlobalmount(dl)` on `two-vol` | `workload_test.go` |
-| S12 | Control plane killed mid-remediation | shadow file + worker frozen after the quarantine task, `Kill(controlplane)` in `awaiting_unstage_completion` | `resume_test.go` |
+| S12 | Control plane killed mid-remediation | shadow file; worker frozen in draining, then the csi-smb `smb` container frozen (kubelet cannot unstage) and the worker thawed; `Kill(controlplane)` in `awaiting_unstage_completion` | `resume_test.go` |
 | S12a | Worker killed mid-host-task | worker frozen in `draining`, `KillNow(worker)` with the `releasing_mounts` task pending (a quarantine task runs in milliseconds and cannot be interrupted deterministically) | `resume_test.go` |
 | S12b | Remediation deleted mid-episode | delete the `smbr` in `draining` | `resume_test.go` |
 | S13 | Samba restart with a new IP | `Samba.Restart()` | `samba_test.go` |

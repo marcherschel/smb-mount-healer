@@ -232,31 +232,48 @@ func (f *F) QuarantineFolders() []string {
 // and leases but does nothing.
 func (f *F) Freeze(pod *corev1.Pod) {
 	f.T.Helper()
-	f.signal(pod, "STOP")
-	f.T.Cleanup(func() { f.thawQuietly(pod) })
+	f.FreezeContainer(pod, "")
 }
 
 // Thaw sends SIGCONT to pod's first container.
 func (f *F) Thaw(pod *corev1.Pod) {
 	f.T.Helper()
-	f.signal(pod, "CONT")
+	f.ThawContainer(pod, "")
 }
 
-func (f *F) thawQuietly(pod *corev1.Pod) {
-	cid := containerID(pod)
+// FreezeContainer is Freeze for the named container of pod ("" = the first
+// container status; statuses are sorted by name, not in spec order).
+func (f *F) FreezeContainer(pod *corev1.Pod, container string) {
+	f.T.Helper()
+	f.signal(pod, container, "STOP")
+	f.T.Cleanup(func() { f.thawQuietly(pod, container) })
+}
+
+// ThawContainer sends SIGCONT to the named container of pod.
+func (f *F) ThawContainer(pod *corev1.Pod, container string) {
+	f.T.Helper()
+	f.signal(pod, container, "CONT")
+}
+
+func (f *F) thawQuietly(pod *corev1.Pod, container string) {
+	cid := containerID(pod, container)
 	if cid == "" {
 		return
 	}
 	_, _ = f.Chaos.Exec(pod.Spec.NodeName, "sh", "-c", pidsScript(cid)+` | xargs -r kill -CONT 2>/dev/null || true`)
 }
 
-func (f *F) signal(pod *corev1.Pod, sig string) {
+func (f *F) signal(pod *corev1.Pod, container, sig string) {
 	f.T.Helper()
-	cid := containerID(pod)
-	f.G.Expect(cid).NotTo(gomega.BeEmpty(), "container id of %s", pod.Name)
+	cid := containerID(pod, container)
+	f.G.Expect(cid).NotTo(gomega.BeEmpty(), "container id of %s (container %q)", pod.Name, container)
 	out := f.Chaos.Sh(pod.Spec.NodeName, fmt.Sprintf(`pids=$(%s); [ -n "$pids" ] || { echo "no processes for %s" >&2; exit 1; }; kill -%s $pids; echo $pids`,
 		pidsScript(cid), pod.Name, sig))
-	f.Logf("sent SIG%s to %s/%s (pids %s)", sig, pod.Namespace, pod.Name, strings.TrimSpace(out))
+	name := pod.Namespace + "/" + pod.Name
+	if container != "" {
+		name += "/" + container
+	}
+	f.Logf("sent SIG%s to %s (pids %s)", sig, name, strings.TrimSpace(out))
 }
 
 // pidsScript prints the PIDs whose cgroup names container id cid.
@@ -264,11 +281,16 @@ func pidsScript(cid string) string {
 	return fmt.Sprintf(`for p in /proc/[0-9]*; do grep -qs %s "$p/cgroup" && echo "${p#/proc/}"; done`, ShellQuote(cid))
 }
 
-func containerID(pod *corev1.Pod) string {
-	if len(pod.Status.ContainerStatuses) == 0 {
-		return ""
+// containerID returns the runtime id of the named container of pod ("" = the
+// first container status), or "" if it has none.
+func containerID(pod *corev1.Pod, container string) string {
+	id := ""
+	for i, cs := range pod.Status.ContainerStatuses {
+		if (container == "" && i == 0) || cs.Name == container {
+			id = cs.ContainerID
+			break
+		}
 	}
-	id := pod.Status.ContainerStatuses[0].ContainerID
 	if i := strings.Index(id, "://"); i >= 0 {
 		id = id[i+3:]
 	}

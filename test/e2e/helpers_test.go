@@ -376,6 +376,23 @@ func hostResults(f *framework.F, rem string) map[v1alpha1.HostActionType][]v1alp
 	return out
 }
 
+// waitPendingHostTask waits until a host task of rem exists that has not
+// started (empty phase or Pending), e.g. because the worker is frozen.
+func waitPendingHostTask(f *framework.F, rem string, timeout time.Duration) *v1alpha1.SmbHostTask {
+	f.T.Helper()
+	var pending *v1alpha1.SmbHostTask
+	f.G.Eventually(func(g gomega.Gomega) {
+		pending = nil
+		for _, t := range f.HostTasksOf(rem) {
+			if t.Status.Phase == "" || t.Status.Phase == v1alpha1.HostTaskPending {
+				pending = t.DeepCopy()
+			}
+		}
+		g.Expect(pending).NotTo(gomega.BeNil(), "a host task of %s waiting for the frozen worker", rem)
+	}).WithTimeout(timeout).Should(gomega.Succeed())
+	return pending
+}
+
 // workerPod is the worker on the agent node.
 func workerPod(f *framework.F) *corev1.Pod {
 	f.T.Helper()

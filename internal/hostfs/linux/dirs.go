@@ -30,6 +30,18 @@ var _ hostfs.DirInspector = DirInspector{}
 // it cannot be read safely.
 var errParentMounted = errors.New("parent directory is a mountpoint, refusing to read it")
 
+// testHookBeforeRead, when set (tests only), runs between the parent listing
+// and the read of the directory itself, to reproduce kubelet removing the
+// directory in that window.
+var testHookBeforeRead func(path string)
+
+// vanished reports whether err means path disappeared (or was replaced by a
+// non-directory) after the parent listed it, e.g. kubelet cleaning up the
+// volume dir of a deleted pod. Inspect then reports it as missing.
+func vanished(err error) bool {
+	return errors.Is(err, unix.ENOENT) || errors.Is(err, unix.ENOTDIR)
+}
+
 func (d DirInspector) root() string { return filepath.Clean(d.Layout.Root) }
 
 // readable reports whether dir may be read under snap.
@@ -57,7 +69,7 @@ func (d DirInspector) Inspect(ctx context.Context, path string) (hostfs.DirFacts
 		return hostfs.DirFacts{}, fmt.Errorf("inspect %s: %w", path, errParentMounted)
 	}
 	ents, err := readDirents(parent, 0)
-	if errors.Is(err, unix.ENOENT) || errors.Is(err, unix.ENOTDIR) {
+	if vanished(err) {
 		return hostfs.DirFacts{}, nil
 	}
 	if err != nil {
@@ -83,6 +95,9 @@ func (d DirInspector) Inspect(ctx context.Context, path string) (hostfs.DirFacts
 		// so an lstat is local.
 		var st unix.Stat_t
 		if err := unix.Lstat(path, &st); err != nil {
+			if vanished(err) {
+				return hostfs.DirFacts{}, nil
+			}
 			return hostfs.DirFacts{}, fmt.Errorf("inspect %s: lstat: %w", path, err)
 		}
 		facts.IsDir = st.Mode&unix.S_IFMT == unix.S_IFDIR
@@ -90,7 +105,15 @@ func (d DirInspector) Inspect(ctx context.Context, path string) (hostfs.DirFacts
 	if !facts.IsDir {
 		return facts, nil
 	}
+	if testHookBeforeRead != nil {
+		testHookBeforeRead(path)
+	}
 	first, err := readDirents(path, 1)
+	if vanished(err) {
+		// Listed by the parent a moment ago, gone now: kubelet removed it
+		// (it only removes empty volume dirs). Same result as not listed.
+		return hostfs.DirFacts{}, nil
+	}
 	if err != nil {
 		return hostfs.DirFacts{}, fmt.Errorf("inspect %s: %w", path, sanitize("read directory", err))
 	}
