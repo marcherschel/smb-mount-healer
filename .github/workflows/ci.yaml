@@ -15,6 +15,10 @@ on:
         description: "Pin the k3d node containers to these CPUs (docker --cpuset-cpus, e.g. 0,1); empty = no pinning"
         type: string
         default: ""
+      e2e_run:
+        description: "go test -run regex for the e2e suite (empty = the diagnosis subset set in the e2e job; . = all)"
+        type: string
+        default: ""
   # The release workflow runs the full suite before it publishes anything.
   workflow_call:
     inputs:
@@ -145,8 +149,33 @@ jobs:
       - name: Chart defaults match the binary
         run: go test ./production/...
 
+  # Unit tests, envtest and the simulator golden traces run as three parallel
+  # jobs; e2e starts once all of them (and lint) succeeded.
   unit:
-    name: Unit + envtest
+    name: Unit tests
+    needs: changes
+    if: needs.changes.outputs.suite == 'full'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /github/home/.cache/go-build
+            /github/home/go/pkg/mod
+          key: unit-${{ hashFiles('go.sum') }}
+          restore-keys: unit-
+
+      - name: Unit tests
+        run: make test
+
+  envtest:
+    name: envtest
     needs: changes
     if: needs.changes.outputs.suite == 'full'
     runs-on: ubuntu-latest
@@ -166,8 +195,8 @@ jobs:
           path: |
             /github/home/.cache/go-build
             /github/home/go/pkg/mod
-          key: unit-${{ hashFiles('go.sum') }}
-          restore-keys: unit-
+          key: envtest-go-${{ hashFiles('go.sum') }}
+          restore-keys: envtest-go-
 
       # setup-envtest stores kube-apiserver/etcd under bin/k8s (see Makefile).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -175,11 +204,28 @@ jobs:
           path: bin/k8s
           key: envtest-${{ steps.versions.outputs.kubernetes }}-${{ runner.os }}-${{ runner.arch }}
 
-      - name: Unit tests
-        run: make test
-
       - name: envtest
         run: make test-envtest
+
+  sim:
+    name: Simulator golden traces
+    needs: changes
+    if: needs.changes.outputs.suite == 'full'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /github/home/.cache/go-build
+            /github/home/go/pkg/mod
+          key: sim-${{ hashFiles('go.sum') }}
+          restore-keys: sim-
 
       - name: Simulator golden traces are up to date
         run: |
@@ -191,9 +237,28 @@ jobs:
             exit 1
           fi
 
+  # Keeps the "Unit + envtest" required check of the main ruleset meaningful:
+  # it fails when any of the three jobs above failed or was cancelled (a
+  # skipped e2e alone would satisfy the ruleset) and succeeds when the change
+  # needs no tests (all three skipped).
+  unit-gate:
+    name: Unit + envtest
+    needs: [changes, unit, envtest, sim]
+    if: ${{ !cancelled() && needs.changes.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Unit, envtest and golden traces succeeded (or were not needed)
+        env:
+          RESULTS: ${{ needs.unit.result }} ${{ needs.envtest.result }} ${{ needs.sim.result }}
+        run: |
+          echo "unit envtest sim: ${RESULTS}"
+          for r in ${RESULTS}; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done
+
   e2e:
     name: e2e (k3d + tilt ci)
-    needs: [lint, unit]
+    needs: [lint, unit, envtest, sim]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
@@ -207,6 +272,12 @@ jobs:
       SMBMH_E2E_IMAGE_MODE: k3d-import
       # Empty on pull_request and workflow_call runs (input undefined).
       E2E_NODE_CPUSET: ${{ inputs.e2e_node_cpuset }}
+      # TEMPORARY (diagnosis): only the scenarios that failed in recent runs
+      # (S3 netem in 4 of 5, S12 control plane killed in 2, S4 and S5 once).
+      # Restore the full suite by dropping this line. workflow_dispatch can
+      # override it (e2e_run; "." runs everything). No "$" anchors: make
+      # would expand them; the names are unique as substrings anyway.
+      E2E_GO_TEST_FLAGS: -run '${{ inputs.e2e_run || 'TestS3SlowServerNetem|TestS4WrongFSType|TestS5StatefulSet|TestS12ControlPlaneKilled' }}'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
