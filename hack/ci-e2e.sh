@@ -5,7 +5,6 @@
 #
 #   hack/ci-e2e.sh connect    <cluster>         join this container to k3d-<cluster>
 #   hack/ci-e2e.sh kubeconfig <cluster>         point $KUBECONFIG at k3d-<cluster>-server-0:6443
-#   hack/ci-e2e.sh pin        <cluster> <cpus>  pin the k3d node containers to <cpus> (e.g. 0,1)
 #   hack/ci-e2e.sh info       <cluster>         print runner VM, kernel and cifs module details
 #   hack/ci-e2e.sh collect    <cluster> <dir>   dump CRs, events, logs, node mountinfo, cifs state into <dir>
 #   hack/ci-e2e.sh cleanup    <cluster>         leave the k3d network, remove tilt-built images
@@ -78,17 +77,6 @@ cmd_kubeconfig() {
 # Node containers of the cluster (servers, agents, registry).
 cluster_nodes() {
     docker ps -a --filter "label=k3d.cluster=${1:?cluster}" --format '{{.Names}}'
-}
-
-# Restricts every node container (and so k3s, kubelet, the healer, samba and
-# the workloads) to <cpus>; emulates a smaller runner VM. The CIFS client runs
-# in the host kernel and is not confined by the cpuset.
-cmd_pin() {
-    local cluster=${1:?cluster} cpus=${2:?cpus} node
-    for node in $(cluster_nodes "${cluster}"); do
-        docker update --cpuset-cpus="${cpus}" "${node}" >/dev/null
-        echo "${node}: cpuset ${cpus}, nproc inside: $(docker exec "${node}" nproc)"
-    done
 }
 
 # The job container shares the host kernel but not its view of kernel modules;
@@ -191,9 +179,8 @@ shift || true
 case "${sub}" in
     connect)    cmd_connect "$@" ;;
     kubeconfig) cmd_kubeconfig "$@" ;;
-    pin)        cmd_pin "$@" ;;
     info)       cmd_info "$@" ;;
     collect)    cmd_collect "$@" ;;
     cleanup)    cmd_cleanup "$@" ;;
-    *) echo "usage: $0 {connect|kubeconfig|pin|info|collect|cleanup} <cluster> [dir]" >&2; exit 2 ;;
+    *) echo "usage: $0 {connect|kubeconfig|info|collect|cleanup} <cluster> [dir]" >&2; exit 2 ;;
 esac

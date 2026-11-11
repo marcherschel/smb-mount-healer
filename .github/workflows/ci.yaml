@@ -11,10 +11,6 @@ on:
         description: "Run test/e2e/hack/cifs-dead-server.sh after the e2e suite"
         type: boolean
         default: false
-      e2e_node_cpuset:
-        description: "Pin the k3d node containers to these CPUs (docker --cpuset-cpus, e.g. 0,1); empty = no pinning"
-        type: string
-        default: ""
       e2e_run:
         description: "go test -run regex for the e2e suite (empty = the diagnosis subset set in the e2e job; . = all)"
         type: string
@@ -313,8 +309,6 @@ jobs:
       # The k3d registry's host port is published on the docker host, not on
       # this container's localhost: build with docker + `k3d image import`.
       SMBMH_E2E_IMAGE_MODE: k3d-import
-      # Empty on pull_request and workflow_call runs (input undefined).
-      E2E_NODE_CPUSET: ${{ inputs.e2e_node_cpuset }}
       # TEMPORARY (diagnosis): only the scenarios that failed in recent runs
       # (S3 netem in 4 of 5, S12 control plane killed in 2, S4 and S5 once).
       # Restore the full suite by dropping this line. workflow_dispatch can
@@ -352,14 +346,6 @@ jobs:
         run: |
           hack/ci-e2e.sh connect "$E2E_CLUSTER"
           hack/ci-e2e.sh kubeconfig "$E2E_CLUSTER"
-
-      # ubuntu-latest is a 2 vCPU VM for private repos and a 4 vCPU VM for
-      # public ones, with the same runner image; S3's netem variant behaved
-      # differently between the two. Pinning the node containers emulates the
-      # smaller VM (the job container, go test and tilt stay unpinned).
-      - name: Pin k3d nodes to CPUs (workflow_dispatch e2e_node_cpuset)
-        if: ${{ env.E2E_NODE_CPUSET != '' }}
-        run: hack/ci-e2e.sh pin "$E2E_CLUSTER" "$E2E_NODE_CPUSET"
 
       - name: Runner + kernel info
         continue-on-error: true
