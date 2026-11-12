@@ -71,14 +71,19 @@ grep '^=== PROGRESS' test/e2e/_runs/<cluster>.go-test.log | tail -1   # e.g. 15/
 grep -E '^(--- FAIL|FAIL|ok )' test/e2e/_runs/<cluster>.go-test.log
 ```
 
-The suite runs through `hack/go-test.sh`, which prints a
-`=== PROGRESS n/total (x%)` line after every top-level test (total = tests
-selected by `-run`/`-skip` in `E2E_GO_TEST_FLAGS`).
+The suite runs through `hack/go-test.sh`, which runs the top-level tests
+selected by `-run`/`-skip` in `E2E_GO_TEST_FLAGS` one `go test` at a time in a
+fixed order (version sort of the names: S1, S2, S3, S3…Netem, S4 … S12, S12a,
+S12b, S13 …), each with its own timeout (`E2E_TEST_TIMEOUT`, default 20m), and
+prints a `=== PROGRESS n/total (x%)` line after every test and the failed
+names at the end. Regexes with `$` must not go through make (it expands them);
+the test names are unique as substrings, e.g.
+`E2E_GO_TEST_FLAGS="-run 'TestS4WrongFSType|TestS5StatefulSet'"`.
 
 `<cluster>` is `smbmh-e2e-run<ts>` for `make e2e`. Under `make e2e-dev` the
-`e2e-tests` resource writes the same `<cluster>.go-test.log`. The exit code of
-`go test` is kept (pipefail), so a failing suite still fails `make e2e`, which
-still deletes its cluster.
+`e2e-tests` resource writes the same `<cluster>.go-test.log`. The script exits
+non-zero when any test failed (pipefail), so a failing suite still fails
+`make e2e`, which still deletes its cluster.
 
 For interactive debugging, keep a cluster around explicitly and delete it
 when done:
@@ -239,7 +244,7 @@ breaks.
 | S9 | Co-tenant pinning | `DetachGlobalmount(library)` + `DeletePod(cotenant-b)` | `cotenant_test.go` |
 | S10 | Flux fighter | S9 + `EnableFighter("deployment/cotenant-a", 1)` | `cotenant_test.go` |
 | S11 | Two-volume pod | `DetachGlobalmount(dl)` on `two-vol` | `workload_test.go` |
-| S12 | Control plane killed mid-remediation | shadow file + worker frozen after the quarantine task, `Kill(controlplane)` in `awaiting_unstage_completion` | `resume_test.go` |
+| S12 | Control plane killed mid-remediation | shadow file; worker frozen in draining, then the csi-smb `smb` container frozen (kubelet cannot unstage) and the worker thawed; `Kill(controlplane)` in `awaiting_unstage_completion` | `resume_test.go` |
 | S12a | Worker killed mid-host-task | worker frozen in `draining`, `KillNow(worker)` with the `releasing_mounts` task pending (a quarantine task runs in milliseconds and cannot be interrupted deterministically) | `resume_test.go` |
 | S12b | Remediation deleted mid-episode | delete the `smbr` in `draining` | `resume_test.go` |
 | S13 | Samba restart with a new IP | `Samba.Restart()` | `samba_test.go` |

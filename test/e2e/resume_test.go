@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -19,11 +20,23 @@ import (
 // remediation is in awaiting_unstage_completion. The new leader reloads the
 // remediation from its status and finishes it (remediations_resumed).
 //
-// awaiting_unstage_completion normally lasts about a second. To hold it, the
-// bare globalmount carries shadow data (kubelet cannot unstage until it is
-// quarantined) and the worker is frozen (SIGSTOP) the moment the quarantine
-// task succeeded, so the SmbMount keeps reporting the globalmount dir as
-// present; it is thawed once the old control plane is gone.
+// awaiting_unstage_completion normally lasts about a second: it ends when
+// kubelet's NodeUnstageVolume removes the globalmount dir the quarantine just
+// emptied. The stage is held without racing that, by gating on what the
+// remediation waits for instead of on timing:
+//
+//  1. the worker is frozen during draining, so no host task can run and the
+//     remediation stops at the next host task (releasing_mounts or
+//     quarantining), before anything was quarantined;
+//  2. the csi-smb node plugin ("smb" container) is frozen, so kubelet cannot
+//     unstage the volume and the globalmount dir stays;
+//  3. the worker is thawed: it runs the quarantine and keeps reporting the
+//     (now empty) globalmount dir, so the stage stays in
+//     awaiting_unstage_completion for as long as the plugin is frozen;
+//  4. the control plane is replaced, then the plugin is thawed.
+//
+// The hold is far shorter than QUARANTINE_UNSTAGE_WAIT (300s) and than the
+// plugin's liveness probe (5 failures x 30s).
 func TestS12ControlPlaneKilled(t *testing.T) {
 	f := framework.New(t, framework.ClearQuarantines())
 	g := f.G
@@ -31,25 +44,33 @@ func TestS12ControlPlaneKilled(t *testing.T) {
 	rec := f.RecordSmbMounts()
 	pv := framework.PV("config-a")
 	worker := workerPod(f)
+	plugin := f.ReadyPod(framework.CSINamespace, framework.CSINodeLabel, f.AgentNode)
 
 	at := injectWrongFSType(f, pv, "deploy-single", "shadow.txt")
 	r := f.WaitNewRemediation()
-	waitHostTask(f, r.Name, "quarantining", v1alpha1.HostTaskSucceeded, 5*time.Minute)
+	waitStage(f, r.Name, 5*time.Minute, v1alpha1.StageDraining)
 	f.Freeze(worker)
-	// The control plane moves on from quarantining once it sees the task
-	// result; with the worker frozen it must then stop in
-	// awaiting_unstage_completion.
+	stalled := waitPendingHostTask(f, r.Name, 3*time.Minute)
+	f.Logf("worker frozen; remediation %s waits for host task %s in %s", r.Name, stalled.Name, currentStage(f, r.Name))
+	for _, ht := range f.HostTasksOf(r.Name) {
+		g.Expect(strings.Contains(ht.Name, string(v1alpha1.StageQuarantining)) && ht.Status.Phase == v1alpha1.HostTaskSucceeded).
+			To(gomega.BeFalse(), "quarantine task %s ran before the worker was frozen", ht.Name)
+	}
+
+	f.FreezeContainer(plugin, framework.CSINodeContainer)
+	f.Thaw(worker)
+	waitHostTask(f, r.Name, string(v1alpha1.StageQuarantining), v1alpha1.HostTaskSucceeded, 3*time.Minute)
 	stage := waitStage(f, r.Name, time.Minute, v1alpha1.StageAwaitingUnstageCompletion, v1alpha1.StageRestartingDriver,
 		v1alpha1.StageScalingUp, v1alpha1.StageVerifying, v1alpha1.StageFinalizing, v1alpha1.StageDone)
-	f.Logf("worker frozen; remediation %s is in %s", r.Name, stage)
+	f.Logf("csi plugin frozen; remediation %s is in %s", r.Name, stage)
 	g.Expect(stage).To(gomega.Equal(v1alpha1.StageAwaitingUnstageCompletion))
 	g.Consistently(func() v1alpha1.Stage { return currentStage(f, r.Name) }).WithTimeout(5*time.Second).
-		Should(gomega.Equal(v1alpha1.StageAwaitingUnstageCompletion), "stage held while the worker is frozen")
+		Should(gomega.Equal(v1alpha1.StageAwaitingUnstageCompletion), "stage held while kubelet cannot unstage")
 
 	old := f.HealerPod(metrics.ComponentControlPlane)
 	np := f.Kill(metrics.ComponentControlPlane)
 	f.Logf("control plane %s replaced by %s (node %s)", old.Name, np.Name, np.Spec.NodeName)
-	f.Thaw(worker)
+	f.ThawContainer(plugin, framework.CSINodeContainer)
 
 	done := f.WaitRemediation(v1alpha1.OutcomeHealed)
 	g.Expect(done.Name).To(gomega.Equal(r.Name))

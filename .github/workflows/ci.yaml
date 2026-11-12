@@ -11,6 +11,10 @@ on:
         description: "Run test/e2e/hack/cifs-dead-server.sh after the e2e suite"
         type: boolean
         default: false
+      e2e_run:
+        description: "go test -run regex for the e2e suite (empty = all tests)"
+        type: string
+        default: ""
   # The release workflow runs the full suite before it publishes anything.
   workflow_call:
     inputs:
@@ -141,9 +145,74 @@ jobs:
       - name: Chart defaults match the binary
         run: go test ./production/...
 
-  unit:
-    name: Unit + envtest
+  # Downloads the Go modules and compiles every test variant once, under the
+  # one shared key that unit, envtest, sim and e2e restore (restore only).
+  # Without it, a go.sum change (e.g. Renovate) made all of them miss their
+  # own keys and download/compile the same things in parallel.
+  deps:
+    name: Go module + build cache
     needs: changes
+    if: needs.changes.outputs.suite == 'full'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache
+        with:
+          path: |
+            /github/home/.cache/go-build
+            /github/home/go/pkg/mod
+          key: go-${{ hashFiles('go.sum') }}
+          restore-keys: go-
+
+      # Exact hit: a previous run already saved this key, and the save step
+      # would skip anyway. -exec true compiles the test binaries without
+      # running them (the envtest TestMains would start kube-apiserver even
+      # with -run '^$'). -race and the build tags each produce separate
+      # cache entries, so warm every variant the later jobs build.
+      - name: Download modules + warm build cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          go mod download
+          go test -race -exec true ./...                   # make test
+          go test -race -tags envtest -exec true ./...     # make test-envtest
+          go test -exec true ./internal/sim/...            # make sim-update
+          go test -tags e2e -exec true ./test/e2e/...      # e2e suite
+
+  # Unit tests, envtest and the simulator golden traces run as three parallel
+  # jobs; e2e starts once all of them (and lint) succeeded.
+  unit:
+    name: Unit tests
+    needs: [changes, deps]
+    if: needs.changes.outputs.suite == 'full'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Restore only: deps saved this key; the parallel jobs never race to save it.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /github/home/.cache/go-build
+            /github/home/go/pkg/mod
+          key: go-${{ hashFiles('go.sum') }}
+          restore-keys: go-
+
+      - name: Unit tests
+        run: make test
+
+  envtest:
+    name: envtest
+    needs: [changes, deps]
     if: needs.changes.outputs.suite == 'full'
     runs-on: ubuntu-latest
     container:
@@ -157,13 +226,14 @@ jobs:
         id: versions
         run: echo "kubernetes=$(sed -n 's/^KUBERNETES_VERSION=//p' versions.env)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restore only: deps saved this key; the parallel jobs never race to save it.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             /github/home/.cache/go-build
             /github/home/go/pkg/mod
-          key: unit-${{ hashFiles('go.sum') }}
-          restore-keys: unit-
+          key: go-${{ hashFiles('go.sum') }}
+          restore-keys: go-
 
       # setup-envtest stores kube-apiserver/etcd under bin/k8s (see Makefile).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -171,11 +241,29 @@ jobs:
           path: bin/k8s
           key: envtest-${{ steps.versions.outputs.kubernetes }}-${{ runner.os }}-${{ runner.arch }}
 
-      - name: Unit tests
-        run: make test
-
       - name: envtest
         run: make test-envtest
+
+  sim:
+    name: Simulator golden traces
+    needs: [changes, deps]
+    if: needs.changes.outputs.suite == 'full'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Restore only: deps saved this key; the parallel jobs never race to save it.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            /github/home/.cache/go-build
+            /github/home/go/pkg/mod
+          key: go-${{ hashFiles('go.sum') }}
+          restore-keys: go-
 
       - name: Simulator golden traces are up to date
         run: |
@@ -187,9 +275,29 @@ jobs:
             exit 1
           fi
 
+  # Keeps the "Unit + envtest" required check of the main ruleset meaningful:
+  # it fails when any of the jobs above failed or was cancelled (a skipped e2e
+  # alone would satisfy the ruleset) and succeeds when the change needs no
+  # tests (all skipped). deps is checked too: when it fails, the three test
+  # jobs are skipped, and skipped alone must not pass.
+  unit-gate:
+    name: Unit + envtest
+    needs: [changes, deps, unit, envtest, sim]
+    if: ${{ !cancelled() && needs.changes.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Unit, envtest and golden traces succeeded (or were not needed)
+        env:
+          RESULTS: ${{ needs.deps.result }} ${{ needs.unit.result }} ${{ needs.envtest.result }} ${{ needs.sim.result }}
+        run: |
+          echo "deps unit envtest sim: ${RESULTS}"
+          for r in ${RESULTS}; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done
+
   e2e:
     name: e2e (k3d + tilt ci)
-    needs: [lint, unit]
+    needs: [lint, unit, envtest, sim]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
@@ -201,18 +309,22 @@ jobs:
       # The k3d registry's host port is published on the docker host, not on
       # this container's localhost: build with docker + `k3d image import`.
       SMBMH_E2E_IMAGE_MODE: k3d-import
+      # Full suite; workflow_dispatch can narrow it (e2e_run). No "$" anchors:
+      # make would expand them; the names are unique as substrings anyway.
+      E2E_GO_TEST_FLAGS: -run '${{ inputs.e2e_run || '.' }}'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restore only: deps saved this key; the parallel jobs never race to save it.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             /github/home/.cache/go-build
             /github/home/go/pkg/mod
-          key: e2e-${{ hashFiles('go.sum') }}
-          restore-keys: e2e-
+          key: go-${{ hashFiles('go.sum') }}
+          restore-keys: go-
 
       # Per-job kubeconfig (RUNNER_TEMP is wiped after the job), so k3d/tilt
       # never touch the persistent /github/home/.kube/config.
@@ -231,6 +343,12 @@ jobs:
         run: |
           hack/ci-e2e.sh connect "$E2E_CLUSTER"
           hack/ci-e2e.sh kubeconfig "$E2E_CLUSTER"
+
+      - name: Runner + kernel info
+        continue-on-error: true
+        run: |
+          mkdir -p "$E2E_ARTIFACTS"
+          hack/ci-e2e.sh info "$E2E_CLUSTER" | tee "$E2E_ARTIFACTS/runner-info.txt"
 
       # Also the Tiltfile's first resource; run it here so a missing cifs
       # module fails fast with a readable step instead of inside tilt ci.
