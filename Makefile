@@ -3,11 +3,12 @@ SHELL := /usr/bin/env bash
 .SHELLFLAGS := -euo pipefail -c
 .DEFAULT_GOAL := help
 
-# ---- Versions (single source of truth: versions.env) --------------------------
-# Plain KEY=value lines; a variable given on the command line or in the
-# environment wins (e.g. make test-envtest KUBERNETES_VERSION=1.36.0).
-VERSIONS_ENV := $(CURDIR)/versions.env
-$(foreach line,$(shell grep -E '^[A-Z0-9_]+=' $(VERSIONS_ENV)),$(eval $(word 1,$(subst =, ,$(line))) ?= $(patsubst $(word 1,$(subst =, ,$(line)))=%,%,$(line))))
+# ---- Versions (single source of truth: versions.env + tools.env) --------------
+# versions.env: what the tests run against; tools.env: lint/chart/CI-image
+# tooling. Plain KEY=value lines; a variable given on the command line or in
+# the environment wins (e.g. make test-envtest KUBERNETES_VERSION=1.36.0).
+VERSIONS_ENV := $(CURDIR)/versions.env $(CURDIR)/tools.env
+$(foreach line,$(shell grep -hE '^[A-Z0-9_]+=' $(VERSIONS_ENV)),$(eval $(word 1,$(subst =, ,$(line))) ?= $(patsubst $(word 1,$(subst =, ,$(line)))=%,%,$(line))))
 
 # App (binary + image) version: the latest app tag (vX.Y.Z -> X.Y.Z); the
 # release workflow passes VERSION explicitly. Chart tags (chart-v*) never count.
@@ -223,5 +224,5 @@ $(LOCALBIN)/helm-%: ## Download the pinned helm release into bin/ (sha256-verifi
 	HELM_VERSION=$* INSTALL_DIR=$(LOCALBIN) BIN_NAME=helm-$* hack/tools/install.sh helm
 
 .PHONY: tools
-tools: ## Install kubectl, helm, k3d, tilt, golangci-lint, yq and oras at the versions.env pins into ~/.local/bin.
+tools: ## Install kubectl, helm, k3d, tilt, golangci-lint, yq and oras at the versions.env/tools.env pins into ~/.local/bin.
 	hack/tools/install.sh

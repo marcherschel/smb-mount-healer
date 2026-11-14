@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs the pinned developer tools from versions.env, sha256-verified.
+# Installs the pinned developer tools from versions.env and tools.env, sha256-verified.
 #
 #   hack/tools/install.sh [tool...]   tools: kubectl helm k3d tilt golangci-lint yq oras
 #                                     (default: all of them)
@@ -8,7 +8,7 @@
 #   INSTALL_DIR  target directory (default: ~/.local/bin)
 #   BIN_NAME     file name for a single tool (default: the tool name); the
 #                Makefile uses it for its versioned bin/<tool>-<version> copies
-#   <TOOL>_VERSION (e.g. HELM_VERSION) overrides the versions.env pin
+#   <TOOL>_VERSION (e.g. HELM_VERSION) overrides the pin
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -16,7 +16,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 while IFS='=' read -r key value; do
   [[ -z "$key" || "$key" == \#* ]] && continue
   [[ -z "${!key:-}" ]] && export "$key=$value"
-done < "$ROOT/versions.env"
+done < <(cat "$ROOT/versions.env" "$ROOT/tools.env")
 
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 

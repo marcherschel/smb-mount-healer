@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the CI image locally from versions.env (CI builds it with
+# Builds the CI image locally from versions.env and tools.env (CI builds it with
 # .github/workflows/ci-image.yaml).
 #
 #   .github/ci-image/build.sh                 # native platform, loaded into docker
@@ -11,6 +11,8 @@ DIR=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$DIR/../.." && pwd)
 # shellcheck disable=SC1091
 source "$ROOT/versions.env"
+# shellcheck disable=SC1091
+source "$ROOT/tools.env"
 
 IMAGE=${IMAGE:-smb-mount-healer-ci:local}
 # OUTPUT unset: --load; set but empty: build only.

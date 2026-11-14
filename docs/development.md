@@ -10,9 +10,15 @@ Go (the `toolchain` line in `go.mod`), Docker with buildx, and
 make tools    # kubectl, helm, k3d, tilt, golangci-lint, yq, oras -> ~/.local/bin (sha256-verified)
 ```
 
-Every tool and dependency version lives in [`versions.env`](../versions.env)
-(plain `KEY=value`, read by make, the scripts, the CI image and the Tiltfile;
-updated by Renovate). `controller-gen` and `setup-envtest` are pinned through
+Every tool and dependency version lives in one of two files (plain
+`KEY=value`, read by make, the scripts and the CI image; updated by Renovate):
+
+- [`versions.env`](../versions.env): what the tests run against (envtest's
+  Kubernetes, the e2e k3s image, the csi-driver-smb chart the Tiltfile
+  installs). A change runs the full CI suite.
+- [`tools.env`](../tools.env): support tools (k3d, tilt, helm, helm-docs,
+  golangci-lint, yq, oras). A change runs only the lint job.
+ `controller-gen` and `setup-envtest` are pinned through
 `tool` directives in `go.mod`. `make lint` and the chart targets download the
 pinned golangci-lint and helm into `bin/` when the installed version differs.
 

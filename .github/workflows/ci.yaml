@@ -1,9 +1,14 @@
 name: ci
 
-# No run on pushes to main: changes only reach main through PRs (main
-# ruleset), and the PR run is the trust boundary; validating the merge again
-# would only repeat it.
+# Pushes to main (PR merges) run again: the main ruleset does not require a
+# PR to be up to date with main before it merges (merge queues are not
+# available for repositories of personal accounts), so two PRs that each
+# passed against an older main are only tested together here. A push run
+# picks its suite like a PR run (hack/ci-needs-run.sh on the merged commit),
+# and is never cancelled by a later push: that one may be docs-only.
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -49,11 +54,13 @@ defaults:
 
 jobs:
   # Decides how much of the suite a change needs (hack/ci-needs-run.sh):
-  #   full  lint, unit/envtest, e2e
-  #   chart lint only (the change is limited to the chart and monitoring/)
-  #   none  nothing (Markdown, workflows other than this one, octo-sts policies)
+  #   full  lint, unit/envtest/simulator, e2e (Go-exposed changes)
+  #   lint  lint only (chart, monitoring/, lint config, tools.env)
+  #   none  nothing (docs, other workflows, CI image, devcontainer, release-only files)
   # Skipped jobs satisfy the required checks of the main ruleset;
   # paths-ignore on the trigger would leave them pending forever instead.
+  # That is also why the Unit + envtest gate fails when this job does not
+  # succeed: otherwise every required check would be skipped, i.e. green.
   changes:
     name: Detect relevant changes
     runs-on: ubuntu-latest
@@ -69,9 +76,17 @@ jobs:
         id: decide
         env:
           EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          # The calling workflow's file when this runs as workflow_call (a
+          # release-app tag push is also a push event).
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          CI_WORKFLOW: ${{ github.repository }}/.github/workflows/ci.yaml@
         run: |
           if [ "$EVENT" = pull_request ]; then
             # The PR checkout is the merge commit; its first parent is the base.
+            suite=$(git diff --name-only HEAD^1 HEAD | hack/ci-needs-run.sh)
+          elif [ "$EVENT" = push ] && [ "$REF" = refs/heads/main ] && [[ "$WORKFLOW_REF" == "$CI_WORKFLOW"* ]]; then
+            # A squash merge: its only parent is the previous main.
             suite=$(git diff --name-only HEAD^1 HEAD | hack/ci-needs-run.sh)
           else
             # Releases (workflow_call from the tag-triggered release
@@ -106,6 +121,9 @@ jobs:
           key: lint-${{ hashFiles('go.sum') }}
           restore-keys: lint-
 
+      - name: CI suite selection (hack/ci-needs-run.sh)
+        run: hack/ci-needs-run_test.sh
+
       - name: go mod tidy check
         run: make tidy-check
 
@@ -134,7 +152,7 @@ jobs:
         run: make chart-lint chart-test
 
       # values.yaml defaults == the binary's defaults (internal/config). Also
-      # part of the unit tests, repeated here because chart-only changes skip
+      # part of the unit tests, repeated here because lint-only changes skip
       # the unit job.
       - name: Chart defaults match the binary
         run: go test ./production/...
@@ -277,14 +295,21 @@ jobs:
   unit-gate:
     name: Unit + envtest
     needs: [changes, deps, unit, envtest, sim]
-    if: ${{ !cancelled() && needs.changes.result == 'success' }}
+    # Also runs when change detection failed: then lint and e2e are skipped
+    # (green), and this required check must be the one that fails.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Unit, envtest and golden traces succeeded (or were not needed)
+      - name: Change detection, unit, envtest and golden traces succeeded (or were not needed)
         env:
+          CHANGES: ${{ needs.changes.result }}
           RESULTS: ${{ needs.deps.result }} ${{ needs.unit.result }} ${{ needs.envtest.result }} ${{ needs.sim.result }}
         run: |
-          echo "deps unit envtest sim: ${RESULTS}"
+          echo "changes: ${CHANGES}; deps unit envtest sim: ${RESULTS}"
+          if [ "${CHANGES}" != success ]; then
+            echo "::error::change detection ${CHANGES}: nothing was tested"
+            exit 1
+          fi
           for r in ${RESULTS}; do
             case "$r" in success|skipped) ;; *) exit 1 ;; esac
           done
