@@ -74,10 +74,11 @@
     },
     {
       "customType": "regex",
-      "description": "Digest-pinned images in the chart (helm test pod) and the chart tests (kubeconform, promtool)",
+      "description": "Digest-pinned images in the chart (helm test pod), the chart tests (kubeconform, promtool) and the e2e diagnostics (dmesg fallback)",
       "managerFilePatterns": [
         "/^production/smb-mount-healer/values\\.yaml$/",
-        "/^hack/chart-test\\.sh$/"
+        "/^hack/chart-test\\.sh$/",
+        "/^hack/ci-e2e\\.sh$/"
       ],
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n(?:\\s*#[^\\n]*\\n)*\\s*[A-Za-z_]+[:=]\\s*[^\\s:@]+(?::[^\\s:@]+)?:(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"

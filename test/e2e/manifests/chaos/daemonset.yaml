@@ -28,13 +28,16 @@ spec:
           # Plain alpine; mount.cifs (cifs-utils), umount -l / findmnt
           # (util-linux) and tc (iproute2, S3 netem) are installed at start. Needs egress to the alpine
           # mirrors; the pod is Ready only once the tools are present.
+          # util-linux also brings dmesg (--time-format=iso); hack/ci-e2e.sh
+          # collect reads the host kernel log through this pod, because the
+          # k3s node image has no dmesg.
           image: alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -e
               apk add --no-cache cifs-utils util-linux coreutils findutils iproute2 procps >/dev/null
-              command -v mount.cifs findmnt tc pgrep
+              command -v mount.cifs findmnt tc pgrep dmesg
               touch /tmp/ready
               exec sleep infinity
           readinessProbe:

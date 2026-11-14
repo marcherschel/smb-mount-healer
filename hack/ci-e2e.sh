@@ -13,6 +13,9 @@
 set -euo pipefail
 
 HEALER_NS=smb-mount-healer-system
+# Fallback for collect_dmesg; same image as the chaos DaemonSet.
+# renovate: datasource=docker depName=alpine
+DMESG_IMAGE=alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 # Full id of the container this script runs in. Docker bind-mounts
 # /var/lib/docker/containers/<id>/{hostname,hosts,resolv.conf} into every
@@ -96,6 +99,25 @@ cmd_info() {
     fi
 }
 
+# The host kernel log. The k3s node image has no dmesg, so read it through the
+# privileged chaos pod (util-linux dmesg, ISO timestamps). If that pod is not
+# there (setup failed before it), fall back to a throwaway privileged busybox
+# container on the docker host (timestamps in seconds since boot; uptime and
+# date are printed first to convert them).
+collect_dmesg() {
+    local cluster=${1:?cluster} pod
+    pod=$(kubectl --context "k3d-${cluster}" --request-timeout=30s -n smbmh-chaos \
+        get pods -l app.kubernetes.io/name=chaos --field-selector=status.phase=Running \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [ -n "${pod}" ] && kubectl --context "k3d-${cluster}" --request-timeout=60s -n smbmh-chaos \
+        exec "${pod}" -- dmesg --time-format=iso; then
+        return 0
+    fi
+    echo "# chaos pod unavailable (${pod:-none}); busybox dmesg via docker" >&2
+    docker run --rm --privileged "${DMESG_IMAGE}" \
+        sh -c 'echo "# date: $(date -u +%FT%TZ) uptime: $(cut -d" " -f1 /proc/uptime)s"; dmesg'
+}
+
 cmd_collect() {
     local cluster=${1:?cluster} dir=${2:?dir} ctx node pod
     ctx="k3d-${cluster}"
@@ -148,9 +170,9 @@ cmd_collect() {
 
     # Host kernel state (shared by all node containers): the kernel log and the
     # CIFS client's sessions, tree connects, in-flight requests and credits.
+    collect_dmesg "${cluster}" >"${dir}/dmesg.txt" 2>&1
     node=$(cluster_nodes "${cluster}" | grep -- '-server-0$' | head -n1 || true)
     if [ -n "${node}" ]; then
-        docker exec "${node}" sh -c 'dmesg -T 2>/dev/null || dmesg' >"${dir}/dmesg.txt" 2>&1
         docker exec "${node}" cat /proc/fs/cifs/DebugData >"${dir}/cifs-DebugData.txt" 2>&1
         docker exec "${node}" cat /proc/fs/cifs/Stats >"${dir}/cifs-Stats.txt" 2>&1
     fi
