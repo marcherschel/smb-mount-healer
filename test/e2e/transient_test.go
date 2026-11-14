@@ -100,6 +100,9 @@ func TestS2TransientBlip(t *testing.T) {
 	}
 }
 
+// slowConfirmWindow is SLOW_CONFIRM_WINDOW in values-e2e.yaml.
+const slowConfirmWindow = 60 * time.Second
+
 // TestS3SlowServer: smbd is frozen for 20s, longer than STAT_TIMEOUT (5s)
 // but shorter than SLOW_CONFIRM_WINDOW (60s in values-e2e.yaml). Probes time
 // out or hang (stat_timeout / probe_hung), mounts stay Suspect and recover;
@@ -109,7 +112,7 @@ func TestS2TransientBlip(t *testing.T) {
 // window turned into Broken.
 func TestS3SlowServer(t *testing.T) {
 	f := framework.New(t)
-	slowServer(f, func() {
+	slowServer(f, false, func() {
 		f.Logf("SIGSTOP smbd for 20s")
 		f.Samba.Pause(20 * time.Second)
 	})
@@ -117,6 +120,13 @@ func TestS3SlowServer(t *testing.T) {
 
 // TestS3SlowServerNetem: the S3 variant with a 6s tc netem delay on the
 // samba pod's veth for 20s. Skipped when sch_netem is unavailable.
+//
+// The delay alone must never reach Broken. But on the hosted runners one
+// share sometimes keeps timing out long after the delay is gone (slow
+// failures with good probes in between, for 10-20 minutes; see #20). That
+// mount must not stay degraded: SLOW_RECOVERY_WINDOW keeps its failure
+// streak across the good probes, so it is Broken once its first failure is
+// SLOW_CONFIRM_WINDOW old, and the remediation (remount) must heal it.
 func TestS3SlowServerNetem(t *testing.T) {
 	f := framework.New(t)
 	f.WaitBaseline()
@@ -131,7 +141,7 @@ func TestS3SlowServerNetem(t *testing.T) {
 	if out, err := f.Chaos.Exec(node, "sh", "-c", fmt.Sprintf("tc qdisc add dev %[1]s root netem delay 1ms && tc qdisc del dev %[1]s root", dev)); err != nil {
 		t.Skipf("sch_netem unavailable on the host kernel (tc on %s: %v %s)", dev, err, out.Stderr)
 	}
-	slowServer(f, func() {
+	slowServer(f, true, func() {
 		f.Logf("netem delay 6s on %s (%s) for 20s", dev, node)
 		f.T.Cleanup(func() {
 			_, _ = f.Chaos.Exec(node, "sh", "-c", "tc qdisc del dev "+dev+" root 2>/dev/null || true")
@@ -141,7 +151,13 @@ func TestS3SlowServerNetem(t *testing.T) {
 	})
 }
 
-func slowServer(f *framework.F, inject func()) {
+// slowServer injects a slow server (shorter than SLOW_CONFIRM_WINDOW) and
+// waits until every mount is Healthy again. Without flapping, no mount may
+// reach Broken and no remediation may start. With flapping, a mount that
+// keeps failing after the fault is gone may reach Broken, but no sooner than
+// SLOW_CONFIRM_WINDOW after the injection, and only through slow failures;
+// every remediation must heal, and none may trigger on a mount twice.
+func slowServer(f *framework.F, flapping bool, inject func()) {
 	f.T.Helper()
 	g := f.G
 	f.WaitBaseline()
@@ -149,11 +165,46 @@ func slowServer(f *framework.F, inject func()) {
 	cp0 := f.Metrics(metrics.ComponentControlPlane)
 	w0 := f.Metrics(metrics.ComponentWorker)
 
+	injectedAt := time.Now()
 	inject()
 	g.Eventually(func() []string { return suspectMounts(f, rec) }).WithTimeout(time.Minute).
 		WithPolling(500*time.Millisecond).ShouldNot(gomega.BeEmpty(), "some SmbMount goes Suspect")
-	expectAllHealthy(f)
-	g.Expect(brokenMounts(f, rec)).To(gomega.BeEmpty(), "a slow server shorter than SLOW_CONFIRM_WINDOW must never reach Broken")
+
+	timeout := 3 * time.Minute
+	if flapping {
+		timeout = framework.RemediationTimeout
+	}
+	g.Eventually(func(g gomega.Gomega) {
+		for _, r := range f.NewRemediations() {
+			if !flapping {
+				gomega.StopTrying(fmt.Sprintf("remediation %s started (trigger %v): a slow server shorter than SLOW_CONFIRM_WINDOW must never reach Broken",
+					r.Name, r.Spec.Trigger.SmbMounts)).Now()
+			}
+			g.Expect(r.Status.Stage.Terminal()).To(gomega.BeTrue(), "remediation %s at %s", r.Name, r.Status.Stage)
+			if r.Status.Outcome != v1alpha1.OutcomeHealed {
+				gomega.StopTrying(fmt.Sprintf("remediation %s finished %s; trace %s; message %q", r.Name, r.Status.Outcome,
+					framework.FormatTrace(framework.StageTraceOf(&r)), r.Status.Message)).Now()
+			}
+		}
+		for _, m := range f.SmbMounts() {
+			g.Expect(m.Status.Health).To(gomega.Equal(v1alpha1.HealthHealthy), "smbm %s", m.Name)
+			for _, pm := range m.Status.PodMounts {
+				g.Expect(pm.Health).To(gomega.Equal(v1alpha1.HealthHealthy), "smbm %s pod %s", m.Name, pm.Pod)
+			}
+		}
+	}).WithTimeout(timeout).Should(gomega.Succeed(), "all mounts healthy again")
+
+	broken := brokenMounts(f, rec)
+	if !flapping {
+		g.Expect(broken).To(gomega.BeEmpty(), "a slow server shorter than SLOW_CONFIRM_WINDOW must never reach Broken")
+	}
+	for _, m := range broken {
+		at, _ := rec.FirstSeen(m, v1alpha1.HealthBroken, true)
+		g.Expect(at.Sub(injectedAt)).To(gomega.BeNumerically(">=", slowConfirmWindow),
+			"%s Broken %s after the injection: the fault alone must never reach Broken\n%s",
+			m, at.Sub(injectedAt).Round(time.Second), rec.Describe(m))
+	}
+	expectFlapRemediations(f, broken)
 
 	g.Eventually(func(g gomega.Gomega) {
 		w := f.Metrics(metrics.ComponentWorker)
@@ -162,10 +213,39 @@ func slowServer(f *framework.F, inject func()) {
 			d.Get(metrics.MountChecksTotal, metrics.LabelResult, string(v1alpha1.ReasonProbeHung))
 		g.Expect(slow).To(gomega.BeNumerically(">=", 1), "stat_timeout/probe_hung checks:\n%s", w.Series(metrics.MountChecksTotal))
 		g.Expect(w.Value(metrics.ProbesHung, nil)).To(gomega.BeZero(), "probes_hung back to 0")
-		g.Expect(d.Value(metrics.FalseAlarmsTotal, nil)).To(gomega.BeNumerically(">=", 1), "false_alarms")
+		// Every Suspect mount that recovered by itself is one false alarm.
+		if len(suspectMounts(f, rec)) > len(broken) {
+			g.Expect(d.Value(metrics.FalseAlarmsTotal, nil)).To(gomega.BeNumerically(">=", 1), "false_alarms")
+		}
 	}).Should(gomega.Succeed())
-	expectNoRemediation(f, cp0)
+	if len(broken) == 0 {
+		expectNoRemediation(f, cp0)
+	}
 	for _, m := range suspectMounts(f, rec) {
 		f.Logf("%s healths: %v", m, rec.Healths(m))
+	}
+}
+
+// expectFlapRemediations checks the remediations of a flapping slow server:
+// each was triggered by slow failures of mounts in broken, every mount in
+// broken triggered exactly one, and all of them healed (checked by the
+// caller's wait).
+func expectFlapRemediations(f *framework.F, broken []string) {
+	f.T.Helper()
+	g := f.G
+	triggered := map[string]string{}
+	for _, r := range f.NewRemediations() {
+		f.Logf("mount kept flapping after the fault: remediation %s (%s, trigger %v %v): %s",
+			r.Name, r.Spec.Type, r.Spec.Trigger.SmbMounts, r.Spec.Trigger.Reasons, framework.FormatTrace(framework.StageTraceOf(&r)))
+		g.Expect(r.Spec.Trigger.Reasons).To(gomega.HaveEach(gomega.BeElementOf(v1alpha1.TriggerStatTimeout, v1alpha1.TriggerProbeHung)),
+			"remediation %s: only slow failures", r.Name)
+		for _, m := range r.Spec.Trigger.SmbMounts {
+			g.Expect(broken).To(gomega.ContainElement(m), "remediation %s triggered by %s, which was never Broken", r.Name, m)
+			g.Expect(triggered).NotTo(gomega.HaveKey(m), "%s triggered %s and %s", m, triggered[m], r.Name)
+			triggered[m] = r.Name
+		}
+	}
+	for _, m := range broken {
+		g.Expect(triggered).To(gomega.HaveKey(m), "Broken %s was never remediated", m)
 	}
 }

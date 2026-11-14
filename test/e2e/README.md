@@ -235,7 +235,7 @@ breaks.
 |---|---|---|---|
 | S1 | Baseline | - | `baseline_test.go` |
 | S2 | Transient blip | `Samba.Pause(7s)` | `transient_test.go` |
-| S3 | Slow server | `Samba.Pause(20s)` (< SLOW_CONFIRM_WINDOW 60s, which leaves room for the client's recovery tail after SIGCONT); `TestS3SlowServerNetem`: 6s netem delay on the samba veth (skipped without sch_netem) | `transient_test.go` |
+| S3 | Slow server | `Samba.Pause(20s)` (< SLOW_CONFIRM_WINDOW 60s, which leaves room for the client's recovery tail after SIGCONT); `TestS3SlowServerNetem`: 6s netem delay on the samba veth (skipped without sch_netem); a share that keeps flapping after the delay may reach Broken (not before SLOW_CONFIRM_WINDOW) and must be healed by its remediation | `transient_test.go` |
 | S4 | WRONG_FSTYPE | pinner + `DetachGlobalmount(config-a)` + `DeletePod(deploy-single)` | `workload_test.go` |
 | S5 | StatefulSet | S4 on `sts-single` | `workload_test.go` |
 | S6 | Shadow files in an unmounted globalmount | detach gm, `Chaos.WriteFile` into it, `Scale(w, 0)` | `sweep_test.go` (`AllowQuarantines`) |

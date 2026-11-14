@@ -196,6 +196,24 @@ func (r *Recorder) Stages(name, remediation string) []v1alpha1.Stage {
 	return out
 }
 
+// FirstSeen returns when name was first observed with health h (top level,
+// or on any pod mount if podMounts is set).
+func (r *Recorder) FirstSeen(name string, h v1alpha1.Health, podMounts bool) (time.Time, bool) {
+	for _, o := range r.Of(name) {
+		if o.Health == h {
+			return o.Time, true
+		}
+		if podMounts {
+			for _, pm := range o.PodMounts {
+				if pm.Health == h {
+					return o.Time, true
+				}
+			}
+		}
+	}
+	return time.Time{}, false
+}
+
 // SawHealth reports whether name was observed with health h (top level,
 // or on any pod mount if podMounts is set).
 func (r *Recorder) SawHealth(name string, h v1alpha1.Health, podMounts bool) bool {
