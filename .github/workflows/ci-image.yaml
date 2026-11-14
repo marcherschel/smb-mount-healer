@@ -1,7 +1,7 @@
 name: ci-image
 
 # Builds the CI toolbox image (.github/ci-image) with the tool versions from
-# versions.env and pushes ghcr.io/<owner>/smb-mount-healer-ci:<commit sha>.
+# versions.env and tools.env and pushes ghcr.io/<owner>/smb-mount-healer-ci:<commit sha>.
 # ci.yaml, release-app.yaml and release-chart.yaml pin it by digest: after this workflow ran, copy the
 # digest from the job summary into those files (Renovate keeps it current
 # afterwards).
@@ -12,11 +12,13 @@ on:
     paths:
       - ".github/ci-image/**"
       - "versions.env"
+      - "tools.env"
       - ".github/workflows/ci-image.yaml"
   pull_request:
     paths:
       - ".github/ci-image/**"
       - "versions.env"
+      - "tools.env"
       - ".github/workflows/ci-image.yaml"
   workflow_dispatch:
 
