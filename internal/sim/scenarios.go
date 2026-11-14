@@ -193,6 +193,8 @@ func Scenarios() []Scenario {
 			},
 		},
 		s03bHungServer(),
+		s03cFlappingServer(),
+		s03dFlappingServerNoRecoveryWindow(),
 		{
 			Name: "s04-wrong-fstype", Max: 20 * time.Minute, Setup: s4Setup, Script: s4Script,
 			Expect: []string{"Workload:healed"}, Check: checkHealedS4,
@@ -460,6 +462,44 @@ func s03bHungServer() Scenario {
 			p = append(p, atLeast(w, metrics.HostActionsTotal, map[string]string{"action": "force_unmount", "result": "succeeded"}, 2)...)
 			return append(p, exactly(w, metrics.ProbesHung, nil, 0)...)
 		},
+	}
+}
+
+// s03cFlappingServer is the mount that keeps flapping after e2e S3 netem:
+// slow failures with ok probes in between. SLOW_RECOVERY_WINDOW keeps the
+// streak across the ok probes (Suspect, no false alarms), so it is Broken
+// once its first failure is SLOW_CONFIRM_WINDOW old, and the remediation's
+// remount (driver restart) clears it.
+func s03cFlappingServer() Scenario {
+	return Scenario{
+		Name: "s03c-flapping-server", Max: 25 * time.Minute, Opts: shortCheckInterval(), Setup: s4Setup,
+		Script: func(w *World) {
+			w.After(10*time.Second, "cifs client degraded: slow 10s of every 30s", func() { w.Samba.Set(SambaServer, ServerFlapping) })
+			w.OnStage(v1alpha1.StageRestartingDriver, "remount clears the degraded client", func() { w.Samba.Set(SambaServer, ServerUp) })
+		},
+		Expect: []string{"Workload:healed"},
+		Check: func(w *World) []string {
+			p := exactly(w, metrics.FalseAlarmsTotal, nil, 0)
+			return append(p, atLeast(w, metrics.MountChecksTotal, map[string]string{"result": string(hostfs.ProbeOK)}, 1)...)
+		},
+	}
+}
+
+// s03dFlappingServerNoRecoveryWindow is s03c with SLOW_RECOVERY_WINDOW=0
+// (the behaviour before it existed): every ok probe ends the streak with a
+// false alarm, the mount is never confirmed and nothing remediates it.
+func s03dFlappingServerNoRecoveryWindow() Scenario {
+	return Scenario{
+		Name: "s03d-flapping-server-no-recovery-window", Max: 10 * time.Minute, Unhealed: true, Settle: time.Second,
+		Opts: Options{Worker: func(c *config.Worker) {
+			c.CheckInterval = 5 * time.Second
+			c.SlowRecoveryWindow = 0
+		}},
+		Setup: s4Setup,
+		Script: func(w *World) {
+			w.After(10*time.Second, "cifs client degraded: slow 10s of every 30s", func() { w.Samba.Set(SambaServer, ServerFlapping) })
+		},
+		Check: func(w *World) []string { return atLeast(w, metrics.FalseAlarmsTotal, nil, 10) },
 	}
 }
 

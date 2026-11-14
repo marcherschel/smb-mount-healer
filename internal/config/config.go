@@ -60,6 +60,7 @@ type Worker struct {
 	StartupGrace             time.Duration // STARTUP_GRACE (10s)
 	PodStartupGrace          time.Duration // POD_STARTUP_GRACE (60s)
 	SlowConfirmWindow        time.Duration // SLOW_CONFIRM_WINDOW (3m)
+	SlowRecoveryWindow       time.Duration // SLOW_RECOVERY_WINDOW (2m; 0: the first ok probe ends a slow streak)
 	ProbeConcurrency         int           // PROBE_CONCURRENCY (4)
 	StatusHeartbeat          time.Duration // STATUS_HEARTBEAT (5m)
 	QuarantineDir            string        // QUARANTINE_DIR ($KUBELET_ROOT/smb-mount-healer-quarantine)
@@ -189,6 +190,7 @@ func parseWorker(e *env) Worker {
 		StartupGrace:             e.dur("STARTUP_GRACE", 10*time.Second),
 		PodStartupGrace:          e.dur("POD_STARTUP_GRACE", 60*time.Second),
 		SlowConfirmWindow:        e.dur("SLOW_CONFIRM_WINDOW", 3*time.Minute),
+		SlowRecoveryWindow:       e.dur("SLOW_RECOVERY_WINDOW", 2*time.Minute),
 		ProbeConcurrency:         int(e.integer("PROBE_CONCURRENCY", 4, 1024)),
 		StatusHeartbeat:          e.dur("STATUS_HEARTBEAT", 5*time.Minute),
 		QuarantineDir:            e.str("QUARANTINE_DIR", filepath.Join(root, "smb-mount-healer-quarantine")),
@@ -255,6 +257,9 @@ func (c Config) Validate() error {
 		})
 		if w.StartupGrace < 0 || w.PodStartupGrace < 0 {
 			add("STARTUP_GRACE and POD_STARTUP_GRACE must not be negative")
+		}
+		if w.SlowRecoveryWindow < 0 {
+			add("SLOW_RECOVERY_WINDOW must not be negative")
 		}
 		if w.RecheckAttempts < 1 {
 			add("RECHECK_ATTEMPTS must be >= 1")

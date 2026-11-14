@@ -283,6 +283,9 @@
             "slowConfirmWindow": {
               "$ref": "#/definitions/duration"
             },
+            "slowRecoveryWindow": {
+              "$ref": "#/definitions/duration"
+            },
             "podStartupGrace": {
               "$ref": "#/definitions/duration"
             },

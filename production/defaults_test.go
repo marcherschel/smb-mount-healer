@@ -61,6 +61,7 @@ var settings = []setting{
 	{path: "worker.probing.recheckDelay", env: "RECHECK_DELAY", mode: config.ModeWorker},
 	{path: "worker.probing.statTimeout", env: "STAT_TIMEOUT", mode: config.ModeWorker},
 	{path: "worker.probing.slowConfirmWindow", env: "SLOW_CONFIRM_WINDOW", mode: config.ModeWorker},
+	{path: "worker.probing.slowRecoveryWindow", env: "SLOW_RECOVERY_WINDOW", mode: config.ModeWorker},
 	{path: "worker.probing.podStartupGrace", env: "POD_STARTUP_GRACE", mode: config.ModeWorker},
 	{path: "worker.probing.startupGrace", env: "STARTUP_GRACE", mode: config.ModeWorker},
 	{path: "worker.probing.probeConcurrency", env: "PROBE_CONCURRENCY", mode: config.ModeWorker},

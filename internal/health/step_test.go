@@ -24,6 +24,14 @@ const (
 	unknown = v1alpha1.HealthUnknown
 )
 
+// rcfg is cfg with a 60s SlowRecoveryWindow.
+var rcfg = Config{RecheckAttempts: 3, SlowConfirmWindow: 3 * time.Minute, SlowRecoveryWindow: time.Minute}
+
+func recovering(r Record, since time.Time) Record {
+	r.RecoveringSince = since
+	return r
+}
+
 func failing(s State, c hostfs.ProbeClass, n int32, first time.Time) Record {
 	return Record{State: s, Reason: Reason(c), FirstFailure: first, Failures: n, LastClass: c}
 }
@@ -155,7 +163,7 @@ func TestStep(t *testing.T) {
 		{
 			name: "suspect probe_error -> errored keeps streak", prev: failing(suspect, hostfs.ProbeStatError, 2, t0),
 			class: hostfs.ProbeError, now: t0.Add(20 * time.Second),
-			want: Record{State: errored, Reason: v1alpha1.ReasonProbeError, FirstFailure: t0, Failures: 2, LastClass: hostfs.ProbeError},
+			want: Record{State: errored, Reason: v1alpha1.ReasonProbeError, FirstFailure: t0, Failures: 2, LastClass: hostfs.ProbeStatError},
 			tr:   &Transition{From: suspect, To: errored, Reason: v1alpha1.ReasonProbeError},
 		},
 		// --- Broken ---
@@ -178,7 +186,7 @@ func TestStep(t *testing.T) {
 		{
 			name: "broken probe_error -> errored (never broken)", prev: failing(broken, hostfs.ProbeStatError, 3, t0),
 			class: hostfs.ProbeError, now: t0.Add(time.Minute),
-			want: Record{State: errored, Reason: v1alpha1.ReasonProbeError, FirstFailure: t0, Failures: 3, LastClass: hostfs.ProbeError},
+			want: Record{State: errored, Reason: v1alpha1.ReasonProbeError, FirstFailure: t0, Failures: 3, LastClass: hostfs.ProbeStatError},
 			tr:   &Transition{From: broken, To: errored, Reason: v1alpha1.ReasonProbeError},
 		},
 		// --- Errored ---
@@ -204,6 +212,60 @@ func TestStep(t *testing.T) {
 			class: hostfs.ProbeNotMountpoint, now: t0.Add(30 * time.Second),
 			want: failing(broken, hostfs.ProbeNotMountpoint, 3, t0),
 			tr:   &Transition{From: errored, To: broken, Reason: v1alpha1.ReasonNotMountpoint},
+		},
+		// --- slow recovery window ---
+		{
+			name: "slow suspect ok -> suspect recovering", prev: failing(suspect, hostfs.ProbeStatTimeout, 2, t0),
+			class: hostfs.ProbeOK, now: t0.Add(20 * time.Second), cfg: &rcfg,
+			want: recovering(failing(suspect, hostfs.ProbeStatTimeout, 2, t0), t0.Add(20*time.Second)),
+		},
+		{
+			name: "recovering ok inside window keeps recovering", prev: recovering(failing(suspect, hostfs.ProbeHung, 2, t0), t0.Add(20*time.Second)),
+			class: hostfs.ProbeOK, now: t0.Add(79 * time.Second), cfg: &rcfg,
+			want: recovering(failing(suspect, hostfs.ProbeHung, 2, t0), t0.Add(20*time.Second)),
+		},
+		{
+			name: "recovering ok after window -> healthy false alarm", prev: recovering(failing(suspect, hostfs.ProbeHung, 2, t0), t0.Add(20*time.Second)),
+			class: hostfs.ProbeOK, now: t0.Add(80 * time.Second), cfg: &rcfg,
+			want: Record{State: healthy},
+			tr:   &Transition{From: suspect, To: healthy, Reason: v1alpha1.ReasonProbeHung, FalseAlarm: true},
+		},
+		{
+			name: "recovering slow failure continues the streak", prev: recovering(failing(suspect, hostfs.ProbeStatTimeout, 2, t0), t0.Add(20*time.Second)),
+			class: hostfs.ProbeStatTimeout, now: t0.Add(30 * time.Second), cfg: &rcfg,
+			want: failing(suspect, hostfs.ProbeStatTimeout, 3, t0),
+		},
+		{
+			name: "recovering slow failure after confirm window -> broken", prev: recovering(failing(suspect, hostfs.ProbeStatTimeout, 2, t0), t0.Add(170*time.Second)),
+			class: hostfs.ProbeStatTimeout, now: t0.Add(3 * time.Minute), cfg: &rcfg,
+			want: failing(broken, hostfs.ProbeStatTimeout, 3, t0),
+			tr:   &Transition{From: suspect, To: broken, Reason: v1alpha1.ReasonStatTimeout},
+		},
+		{
+			name: "recovering probe_error keeps the recovery", prev: recovering(failing(suspect, hostfs.ProbeStatTimeout, 2, t0), t0.Add(20*time.Second)),
+			class: hostfs.ProbeError, now: t0.Add(30 * time.Second), cfg: &rcfg,
+			want: Record{State: errored, Reason: v1alpha1.ReasonProbeError, FirstFailure: t0, Failures: 2,
+				LastClass: hostfs.ProbeStatTimeout, RecoveringSince: t0.Add(20 * time.Second)},
+			tr: &Transition{From: suspect, To: errored, Reason: v1alpha1.ReasonProbeError},
+		},
+		{
+			name: "errored slow streak ok -> suspect recovering", prev: Record{State: errored, Reason: v1alpha1.ReasonProbeError,
+				FirstFailure: t0, Failures: 2, LastClass: hostfs.ProbeStatTimeout},
+			class: hostfs.ProbeOK, now: t0.Add(30 * time.Second), cfg: &rcfg,
+			want: recovering(failing(suspect, hostfs.ProbeStatTimeout, 2, t0), t0.Add(30*time.Second)),
+			tr:   &Transition{From: errored, To: suspect, Reason: v1alpha1.ReasonStatTimeout},
+		},
+		{
+			name: "fast suspect ok -> healthy despite recovery window", prev: failing(suspect, hostfs.ProbeStatError, 2, t0),
+			class: hostfs.ProbeOK, now: t0.Add(20 * time.Second), cfg: &rcfg,
+			want: Record{State: healthy},
+			tr:   &Transition{From: suspect, To: healthy, Reason: v1alpha1.ReasonStatError, FalseAlarm: true},
+		},
+		{
+			name: "slow broken ok -> healthy despite recovery window", prev: failing(broken, hostfs.ProbeStatTimeout, 5, t0),
+			class: hostfs.ProbeOK, now: t0.Add(5 * time.Minute), cfg: &rcfg,
+			want: Record{State: healthy},
+			tr:   &Transition{From: broken, To: healthy, Reason: v1alpha1.ReasonStatTimeout},
 		},
 		{
 			name: "errored with negative failures normalised", prev: Record{State: errored, Reason: v1alpha1.ReasonProbeError, FirstFailure: t0, Failures: -1},
@@ -233,18 +295,23 @@ func TestStep(t *testing.T) {
 	}
 }
 
+// seqObs is one probe of TestSequences: its class, time after t0 and the
+// state it must leave.
+type seqObs struct {
+	class hostfs.ProbeClass
+	at    time.Duration
+	want  State
+}
+
 // TestSequences drives realistic probe sequences end to end.
 func TestSequences(t *testing.T) {
-	type obs struct {
-		class hostfs.ProbeClass
-		at    time.Duration
-		want  State
-	}
+	type obs = seqObs
 	tests := []struct {
 		name string
 		seq  []obs
 		// falseAlarms expected across the sequence.
 		falseAlarms int
+		cfg         *Config // nil: default cfg
 	}{
 		{
 			name: "transient blip (S2)",
@@ -278,6 +345,39 @@ func TestSequences(t *testing.T) {
 			},
 		},
 		{
+			// Same as the flapping case below without the recovery window:
+			// every ok probe starts a new streak, it is never confirmed.
+			name: "flapping slow mount without recovery window stays suspect",
+			seq:  flapping(nil),
+			// One false alarm per ok probe.
+			falseAlarms: 6,
+		},
+		{
+			// e2e S3 netem: after the delay one share keeps timing out with
+			// ok probes in between (gaps of 10-55s at CHECK_INTERVAL 10s).
+			name: "flapping slow mount with recovery window becomes broken",
+			seq:  flapping(&rcfg),
+			cfg:  &rcfg,
+		},
+		{
+			name: "slow server shorter than window recovers after recovery window (S3)",
+			cfg:  &rcfg,
+			seq: []obs{
+				{hostfs.ProbeOK, 0, healthy},
+				{hostfs.ProbeStatTimeout, 60 * time.Second, suspect},
+				{hostfs.ProbeHung, 70 * time.Second, suspect},
+				{hostfs.ProbeHung, 80 * time.Second, suspect},
+				{hostfs.ProbeOK, 90 * time.Second, suspect},
+				{hostfs.ProbeOK, 120 * time.Second, suspect},
+				{hostfs.ProbeOK, 150 * time.Second, healthy},
+				// A later slow failure starts a fresh streak.
+				{hostfs.ProbeStatTimeout, 400 * time.Second, suspect},
+				{hostfs.ProbeOK, 410 * time.Second, suspect},
+				{hostfs.ProbeOK, 470 * time.Second, healthy},
+			},
+			falseAlarms: 2,
+		},
+		{
 			name: "wrong fstype confirms after attempts (S4)",
 			seq: []obs{
 				{hostfs.ProbeOK, 0, healthy},
@@ -293,7 +393,11 @@ func TestSequences(t *testing.T) {
 			fa := 0
 			for i, o := range tt.seq {
 				var tr *Transition
-				rec, tr = Step(rec, o.class, t0.Add(o.at), cfg)
+				c := cfg
+				if tt.cfg != nil {
+					c = *tt.cfg
+				}
+				rec, tr = Step(rec, o.class, t0.Add(o.at), c)
 				if rec.State != o.want {
 					t.Fatalf("step %d (%s): state %s, want %s", i, o.class, rec.State, o.want)
 				}
@@ -306,6 +410,29 @@ func TestSequences(t *testing.T) {
 			}
 		})
 	}
+}
+
+// flapping is a slow-failing mount with an ok probe after every two
+// failures, every 10s from t=0: with c (the recovery window) it is Broken
+// once its first failure is SlowConfirmWindow (3m) old; without it every ok
+// probe is a false alarm and it is never confirmed.
+func flapping(c *Config) []seqObs {
+	var seq []seqObs
+	for i := 0; i < 20; i++ { // ends on the confirming failure (190s)
+		at := time.Duration(i) * 10 * time.Second
+		class, want := hostfs.ProbeStatTimeout, suspect
+		if i%3 == 2 {
+			class = hostfs.ProbeOK
+			if c == nil {
+				want = healthy
+			}
+		}
+		if c != nil && class != hostfs.ProbeOK && at >= c.SlowConfirmWindow {
+			want = broken
+		}
+		seq = append(seq, seqObs{class, at, want})
+	}
+	return seq
 }
 
 // TestRehydration simulates a worker restart after every step: the record is
@@ -336,6 +463,32 @@ func TestRehydration(t *testing.T) {
 	}
 }
 
+// TestRehydrationRecovering: a worker restart while a slow streak is
+// recovering keeps both the streak and the recovery start.
+func TestRehydrationRecovering(t *testing.T) {
+	seq := []hostfs.ProbeClass{
+		hostfs.ProbeStatTimeout, hostfs.ProbeOK, hostfs.ProbeError, hostfs.ProbeOK, hostfs.ProbeStatTimeout,
+		hostfs.ProbeOK, hostfs.ProbeHung, hostfs.ProbeOK, hostfs.ProbeOK, hostfs.ProbeOK, hostfs.ProbeOK,
+	}
+	var straight, restarted Record
+	for i, c := range seq {
+		now := t0.Add(time.Duration(i) * 20 * time.Second)
+		var tr1, tr2 *Transition
+		straight, tr1 = Step(straight, c, now, rcfg)
+		restarted, tr2 = Step(restarted, c, now, rcfg)
+		restarted = FromStatus(restarted.ToStatus())
+		if d := cmp.Diff(straight, restarted); d != "" {
+			t.Fatalf("step %d: rehydrated record differs (-straight +restarted):\n%s", i, d)
+		}
+		if d := cmp.Diff(tr1, tr2); d != "" {
+			t.Fatalf("step %d: transitions differ:\n%s", i, d)
+		}
+	}
+	if straight.State != healthy {
+		t.Fatalf("final state %s, want Healthy", straight.State)
+	}
+}
+
 func TestStatusRoundTrip(t *testing.T) {
 	records := []Record{
 		{State: healthy},
@@ -345,6 +498,7 @@ func TestStatusRoundTrip(t *testing.T) {
 		{State: errored, Reason: v1alpha1.ReasonProbeError, LastClass: hostfs.ProbeError},
 		{State: errored, Reason: v1alpha1.ReasonProbeError, FirstFailure: t0, Failures: 2, LastClass: hostfs.ProbeError},
 		{State: suspect, Reason: v1alpha1.ReasonStatError, Failures: 1, LastClass: hostfs.ProbeStatError},
+		recovering(failing(suspect, hostfs.ProbeStatTimeout, 2, t0), t0.Add(time.Minute)),
 	}
 	for _, r := range records {
 		if d := cmp.Diff(r, FromStatus(r.ToStatus())); d != "" {
@@ -417,9 +571,14 @@ func FuzzStep(f *testing.F) {
 		hostfs.ProbeOK, hostfs.ProbeNotMountpoint, hostfs.ProbeWrongFSType, hostfs.ProbeStatError,
 		hostfs.ProbeStatTimeout, hostfs.ProbeHung, hostfs.ProbeError,
 	}
-	f.Add([]byte{0, 1, 2, 3, 4, 5, 6}, int32(3), uint16(180))
-	f.Fuzz(func(t *testing.T, seq []byte, attempts int32, windowSec uint16) {
-		c := Config{RecheckAttempts: attempts, SlowConfirmWindow: time.Duration(windowSec) * time.Second}
+	f.Add([]byte{0, 1, 2, 3, 4, 5, 6}, int32(3), uint16(180), uint16(0))
+	f.Add([]byte{4, 0, 4, 0, 5, 0, 6, 0, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0}, int32(3), uint16(60), uint16(60))
+	f.Fuzz(func(t *testing.T, seq []byte, attempts int32, windowSec, recoverySec uint16) {
+		c := Config{
+			RecheckAttempts:    attempts,
+			SlowConfirmWindow:  time.Duration(windowSec) * time.Second,
+			SlowRecoveryWindow: time.Duration(recoverySec) * time.Second,
+		}
 		var rec Record
 		for i, b := range seq {
 			class := classes[int(b)%len(classes)]
@@ -438,6 +597,19 @@ func FuzzStep(f *testing.F) {
 			}
 			if d := cmp.Diff(rec, FromStatus(rec.ToStatus())); d != "" {
 				t.Fatalf("round trip:\n%s", d)
+			}
+			// Recovering only on a slow, unconfirmed streak, never Broken or
+			// Healthy, and only within the window.
+			if rec.Recovering() {
+				if rec.State != suspect && rec.State != errored || rec.Failures < 1 || classify(rec.LastClass) != kindSlow {
+					t.Fatalf("recovering record %+v", rec)
+				}
+				if class == hostfs.ProbeOK && now.Sub(rec.RecoveringSince) >= c.SlowRecoveryWindow {
+					t.Fatalf("still recovering after the window: %+v at %s", rec, now)
+				}
+			}
+			if class == hostfs.ProbeOK && rec.State != healthy && !rec.Recovering() {
+				t.Fatalf("ok probe left %s without recovering", rec.State)
 			}
 		}
 	})

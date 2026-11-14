@@ -144,6 +144,8 @@ worker:
     statTimeout: 5s
     # -- `SLOW_CONFIRM_WINDOW`: slow failures (`stat_timeout`, `probe_hung`) must last this long before a mount is Broken.
     slowConfirmWindow: 3m
+    # -- `SLOW_RECOVERY_WINDOW`: after slow failures a mount stays Suspect until it has probed fine for this long; a failure in between continues the streak, so a mount that keeps flapping becomes Broken after `slowConfirmWindow`. `0s`: the first good probe ends the streak.
+    slowRecoveryWindow: 2m
     # -- `POD_STARTUP_GRACE`: mounts of pods younger than this are not judged.
     podStartupGrace: 60s
     # -- `STARTUP_GRACE`: delay after worker start before the first probe round.
