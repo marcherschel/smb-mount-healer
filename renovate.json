@@ -50,7 +50,7 @@
       ]
     },
     {
-      "description": "An app release moves the chart's appVersion: bump the chart version and record the change (the chart is released on its own chart-v* tags). Needs RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS, set in .github/workflows/renovate.yaml.",
+      "description": "An app release moves the chart's appVersion and artifacthub.io/images tag on main (no digest: the chart deploys by tag). The chart version is not bumped here; release-chart.yaml computes it and pins the latest stable app release itself.",
       "matchFileNames": [
         "production/smb-mount-healer/Chart.yaml"
       ],
@@ -58,16 +58,7 @@
         "ghcr.io/marcherschel/smb-mount-healer"
       ],
       "pinDigests": false,
-      "commitMessageTopic": "chart appVersion",
-      "postUpgradeTasks": {
-        "commands": [
-          "hack/bump-chart-version.sh patch 'Default image ghcr.io/marcherschel/smb-mount-healer:{{{newVersion}}}.'"
-        ],
-        "fileFilters": [
-          "production/smb-mount-healer/Chart.yaml"
-        ],
-        "executionMode": "branch"
-      }
+      "commitMessageTopic": "chart appVersion"
     }
   ],
   "customManagers": [

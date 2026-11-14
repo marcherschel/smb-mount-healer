@@ -2,12 +2,15 @@ apiVersion: v2
 type: application
 name: smb-mount-healer
 # The chart is released on its own (tag chart-v<version>,
-# .github/workflows/release-chart.yaml): bump `version` on every chart change
-# (hack/bump-chart-version.sh; CI enforces it via hack/check-chart-version.sh).
-# `appVersion` is the app release (tag v<appVersion>) the chart deploys by
-# default; Renovate bumps it, the artifacthub.io/images tag and the chart
-# version together after each app release.
-version: 0.1.4
+# .github/workflows/release-chart.yaml). Never bump `version` by hand: the
+# release workflow computes it from the chart-v* tags and stamps it, together
+# with `appVersion` (the latest stable app release, tag v<appVersion>), the
+# artifacthub.io/images tag and artifacthub.io/prerelease, into the release
+# commit it tags (hack/stamp-chart.sh). On main, `version` is a placeholder;
+# Renovate keeps `appVersion` and the image tag on the latest app release.
+# Add artifacthub.io/changes entries with your change; entries an earlier
+# release already listed are dropped at release time.
+version: 0.0.0-dev
 appVersion: "0.1.1"
 kubeVersion: ">=1.31.0-0"
 description: "Kubernetes operator that detects and heals broken SMB/CIFS CSI mounts (csi-driver-smb): per-node worker probes, leader-elected control plane remediation with dry-run mode, and quarantine of data written to dead mounts."

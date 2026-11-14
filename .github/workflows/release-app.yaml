@@ -1,29 +1,46 @@
 name: release-app
 
-# App release: pushing a tag vX.Y.Z (or vX.Y.Z-rc.N) publishes, with version X.Y.Z:
+# App release, started by hand (Actions -> release-app -> Run workflow on main)
+# with the kind of release; the version is never typed by hand:
+#   bump: patch|minor|major  next stable version after the latest stable
+#                            v* tag (prerelease: its next -rc.N instead)
+#         rc                 next candidate of the open release candidate line
+# (hack/next-version.sh). The CI suite runs on the main commit; only when it
+# passes is the tag vX.Y.Z created on that commit. Pushing a tag vX.Y.Z (or
+# vX.Y.Z-rc.N) yourself still works. Either way it publishes, with version X.Y.Z:
 #   ghcr.io/<owner>/smb-mount-healer:X.Y.Z   image (linux/amd64 + linux/arm64,
 #                                            SBOM, provenance attestation)
 #   GitHub release vX.Y.Z with dist/app (make dist-app): static binaries
 #   smb-mount-healer-linux-{amd64,arm64} (with provenance attestation), the
 #   CRDs of this API version, SHA256SUMS.
-# The chart is released separately (tags chart-v*, release-chart.yaml); after
-# this release Renovate opens the PR that moves the chart's appVersion here.
+# The chart is released separately (tags chart-v*, release-chart.yaml); every
+# chart release pins the latest stable app release as its appVersion.
 # The full CI suite (lint, unit, envtest, e2e) gates every publish step,
 # unless the tests are skipped on purpose:
 #   - an annotated tag whose message contains "[skip tests]"
 #     (git tag -a v0.1.0 -m "smb-mount-healer v0.1.0 [skip tests]"), or
-#   - a manual run (workflow_dispatch) for an existing tag with skip_tests.
-# A manual run also re-releases a tag whose tag-triggered run failed.
+#   - a manual run (workflow_dispatch) with skip_tests.
+# A manual run with input `tag` re-releases an existing tag whose run failed
+# (`bump` is ignored then).
 
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
   workflow_dispatch:
     inputs:
+      bump:
+        description: "Release kind: patch|minor|major (from the latest stable app release) or rc (next candidate of the open release candidate)"
+        type: choice
+        options: [patch, minor, major, rc]
+        default: patch
+      prerelease:
+        description: "With patch|minor|major: release the next release candidate (-rc.N) of that version instead"
+        type: boolean
+        default: false
       tag:
-        description: "Existing app tag to release (vX.Y.Z or vX.Y.Z-rc.N)"
+        description: "Optional: release this existing app tag again (vX.Y.Z[-rc.N]) instead of a new version"
         type: string
-        required: true
+        default: ""
       skip_tests:
         description: "Publish without running the CI suite first"
         type: boolean
@@ -46,32 +63,56 @@ defaults:
     shell: bash
 
 jobs:
-  # Which tag, which version, and whether the CI suite runs first.
+  # Which tag, which version, which commit, whether the tag must still be
+  # created, and whether the CI suite runs first.
   plan:
     name: Plan
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
       version: ${{ steps.plan.outputs.version }}
+      ref: ${{ steps.plan.outputs.ref }}
+      create_tag: ${{ steps.plan.outputs.create_tag }}
       skip_tests: ${{ steps.plan.outputs.skip_tests }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # tags and their annotations
+          ref: ${{ github.sha }}
 
       - name: Plan
         id: plan
         env:
           INPUT_TAG: ${{ inputs.tag }}
           INPUT_SKIP: ${{ inputs.skip_tests }}
+          BUMP: ${{ inputs.bump }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          tag=${INPUT_TAG:-$GITHUB_REF_NAME}
-          version=${tag#v}
-          if [[ "$tag" != v* || ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::tag ${tag} is not vX.Y.Z[-pre]"
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ -z "$INPUT_TAG" ]; then
+            # New release: next version from the tags, on the main commit.
+            if [ "$GITHUB_REF" != refs/heads/main ]; then
+              echo "::error::new app releases are cut from main (run the workflow on main, not ${GITHUB_REF})"
+              exit 1
+            fi
+            version=$(hack/next-version.sh app "$BUMP" "$PRERELEASE")
+            tag="v${version}"
+            if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+              echo "::error::tag ${tag} already exists"
+              exit 1
+            fi
+            ref=$GITHUB_SHA
+            create_tag=true
+          else
+            tag=${INPUT_TAG:-$GITHUB_REF_NAME}
+            version=${tag#v}
+            if [[ "$tag" != v* || ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::tag ${tag} is not vX.Y.Z[-pre]"
+              exit 1
+            fi
+            git rev-parse -q --verify "refs/tags/${tag}" >/dev/null || { echo "::error::tag ${tag} does not exist"; exit 1; }
+            ref="refs/tags/${tag}"
+            create_tag=false
           fi
-          git rev-parse -q --verify "refs/tags/${tag}" >/dev/null || { echo "::error::tag ${tag} does not exist"; exit 1; }
           skip=false
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             [ "$INPUT_SKIP" = true ] && skip=true
@@ -84,27 +125,54 @@ jobs:
           {
             echo "tag=${tag}"
             echo "version=${version}"
+            echo "ref=${ref}"
+            echo "create_tag=${create_tag}"
             echo "skip_tests=${skip}"
           } >> "$GITHUB_OUTPUT"
-          echo "release ${tag} (version ${version}), skip tests: ${skip}"
+          echo "release ${tag} (version ${version}) from ${ref}, create tag: ${create_tag}, skip tests: ${skip}"
 
   ci:
     needs: plan
     if: needs.plan.outputs.skip_tests != 'true'
     uses: ./.github/workflows/ci.yaml
     with:
-      ref: refs/tags/${{ needs.plan.outputs.tag }}
+      ref: ${{ needs.plan.outputs.ref }}
     permissions:
       contents: read
       packages: read # pull the CI image from GHCR
 
+  # A new release's tag exists only once the suite passed on its commit (or the
+  # tests were skipped on purpose), so a failed run leaves no tag behind and
+  # the next run computes the same version again. Created with the
+  # GITHUB_TOKEN, so it does not trigger this workflow a second time.
+  tag:
+    name: Create tag
+    needs: [plan, ci]
+    if: >-
+      ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.create_tag == 'true' &&
+        (needs.ci.result == 'success' || (needs.ci.result == 'skipped' && needs.plan.outputs.skip_tests == 'true')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create ${{ needs.plan.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          SHA: ${{ needs.plan.outputs.ref }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$SHA" >/dev/null
+          echo "created ${TAG} -> ${SHA}"
+
   publish:
     name: Image + binaries
-    needs: [plan, ci]
-    # Runs after a green CI suite, or when the tests were skipped on purpose.
+    needs: [plan, ci, tag]
+    # Runs after a green CI suite, or when the tests were skipped on purpose,
+    # once the tag exists.
     if: >-
       ${{ !cancelled() && needs.plan.result == 'success' &&
-        (needs.ci.result == 'success' || (needs.ci.result == 'skipped' && needs.plan.outputs.skip_tests == 'true')) }}
+        (needs.ci.result == 'success' || (needs.ci.result == 'skipped' && needs.plan.outputs.skip_tests == 'true')) &&
+        (needs.tag.result == 'success' || (needs.tag.result == 'skipped' && needs.plan.outputs.create_tag != 'true')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

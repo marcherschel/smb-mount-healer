@@ -182,7 +182,7 @@ The chart and the app (image and binary) are released independently from
 the same repository: app releases are tagged `vX.Y.Z`, chart releases
 `chart-vA.B.C`. The chart's `version` is its own SemVer, and its
 `appVersion` is the app release it deploys by default (override with
-`image.tag`). A chart release can ship template, values, dashboard or alert
+`image.tag`): every chart release pins the latest stable app release. A chart release can ship template, values, dashboard or alert
 changes without a new image. While the versions are `0.x` the API is
 `v1alpha1` and may change between minor versions.
 

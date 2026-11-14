@@ -159,9 +159,6 @@ dist-app: ## App release assets into dist/app: static binaries for RELEASE_PLATF
 dist-chart: $(HELM) ## Chart release assets into dist/chart: package, dashboard, rules, PrometheusRule, CRDs, SHA256SUMS.
 	HELM=$(HELM) hack/dist-chart.sh
 
-.PHONY: check-chart-version
-check-chart-version: ## Fail if the chart changed since the last chart-v* tag without a higher Chart.yaml version.
-	hack/check-chart-version.sh
 
 ##@ End-to-end (k3d cluster $(E2E_CLUSTER); environment under test/e2e/)
 
