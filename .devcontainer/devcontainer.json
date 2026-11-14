@@ -10,7 +10,7 @@
     },
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  // kubectl, helm, k3d, tilt, golangci-lint and yq at the versions.env pins.
+  // kubectl, helm, k3d, tilt, golangci-lint and yq at the versions.env/tools.env pins.
   "postCreateCommand": "make tools",
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"

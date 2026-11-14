@@ -14,12 +14,23 @@ make test test-envtest
 make chart-lint chart-test
 ```
 
-CI runs the same checks plus the e2e suite (`make e2e`) on every pull request and before every release; it does not run again after the merge to `main`. How much of it runs depends on
-the change (`hack/ci-needs-run.sh`; skipped checks count as passed): only
-Markdown, images/demo media or workflows other than `ci.yaml` run nothing, changes limited to
-the chart (`production/smb-mount-healer/`, `monitoring/`) run only the lint
-job (chart lint/test, generated files, chart version, chart defaults), and
-everything else runs the full suite. You can run e2e
+CI runs the same checks plus the e2e suite (`make e2e`) on every pull request,
+again after the merge to `main` (a PR does not have to be up to date with
+`main` before it merges, so this is where merged PRs are tested together), and
+before every release. How much of it runs depends on the change
+(`hack/ci-needs-run.sh`, pinned by `hack/ci-needs-run_test.sh`; skipped checks
+count as passed):
+
+- **nothing:** Markdown, images/demo media, workflows other than `ci.yaml`,
+  the CI image sources, the devcontainer, release-only files (`Dockerfile`,
+  `hack/dist-*.sh`, `hack/next-version.sh`, `hack/stamp-chart.sh`),
+  `renovate.json`, `LICENSE`, `.gitignore`.
+- **lint job only:** the chart (`production/smb-mount-healer/`), `monitoring/`,
+  `.golangci.yaml`, the lint-only scripts and `tools.env` (chart lint/test,
+  generated files, chart defaults).
+- **full suite:** everything Go-exposed: Go code, `go.mod`/`go.sum`, `api/`,
+  `config/`, testdata, `test/e2e/`, the `Makefile`, `Dockerfile.tilt`,
+  `versions.env`, `ci.yaml`, and any file not listed above. You can run e2e
 locally on Linux if the machine running Docker has the `cifs` kernel module
 (`sudo modprobe cifs`); it takes about 25 minutes.
 

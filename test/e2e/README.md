@@ -38,7 +38,7 @@ test/e2e/
   `pkg/types/fixes/fixes.go`). Do not export `K3D_FIX_MOUNTS=0`. Preflight
   checks the `shared:` tag of the mount holding `/var/lib/kubelet` in each
   node's mountinfo.
-- Tools: docker, k3d, tilt, kubectl, helm, yq, Go at the `versions.env` pins
+- Tools: docker, k3d, tilt, kubectl, helm, yq, Go at the `versions.env`/`tools.env` pins
   (`make tools` installs them; the devcontainer and the CI image
   `.github/ci-image` have them).
 - Network egress: the chart repo (raw.githubusercontent.com), ghcr.io, Docker
