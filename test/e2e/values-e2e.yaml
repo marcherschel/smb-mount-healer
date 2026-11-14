@@ -36,6 +36,10 @@ worker:
     # Must exceed S3's 20s smbd freeze plus the client's recovery tail: on
     # kernel 6.17 a mount can keep timing out ~20s after smbd resumes.
     slowConfirmWindow: 60s
+    # Longer than the gaps between the failures of a mount that keeps
+    # flapping after S3 netem (up to 55s at checkInterval 10s), so it is
+    # confirmed Broken instead of starting a new streak on every good probe.
+    slowRecoveryWindow: 60s
     podStartupGrace: 10s
   quarantineScan:
     interval: 10s

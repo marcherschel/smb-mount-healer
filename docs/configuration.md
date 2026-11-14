@@ -39,6 +39,7 @@ Worker:
 | `STARTUP_GRACE` | 10s |
 | `POD_STARTUP_GRACE` | 60s |
 | `SLOW_CONFIRM_WINDOW` | 3m |
+| `SLOW_RECOVERY_WINDOW` | 2m |
 | `PROBE_CONCURRENCY` | 4 |
 | `STATUS_HEARTBEAT` | 5m |
 | `QUARANTINE_DIR` | `$KUBELET_ROOT/smb-mount-healer-quarantine` |

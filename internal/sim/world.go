@@ -185,6 +185,7 @@ func NewWorld(opts Options) (*World, error) {
 		StartupGrace:             10 * time.Second,
 		PodStartupGrace:          60 * time.Second,
 		SlowConfirmWindow:        3 * time.Minute,
+		SlowRecoveryWindow:       2 * time.Minute,
 		ProbeConcurrency:         1,
 		StatusHeartbeat:          5 * time.Minute,
 		QuarantineDir:            QuarantineDir,

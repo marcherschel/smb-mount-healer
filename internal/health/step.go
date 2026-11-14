@@ -46,17 +46,28 @@ func classify(c hostfs.ProbeClass) classKind {
 // Rules:
 //   - ok: -> Healthy, debounce cleared. Suspect -> Healthy is a FalseAlarm;
 //     Broken -> Healthy is a recovery. Transition.Reason is the previous reason.
+//     Except after a slow failure (stat_timeout, probe_hung) that is not
+//     Broken, with SlowRecoveryWindow > 0: the mount stays Suspect with its
+//     streak (Failures, FirstFailure, Reason, LastClass) and RecoveringSince
+//     set to the first of these ok probes; only once it has probed ok for
+//     SlowRecoveryWindow does it become Healthy. A failure in between
+//     continues the streak, so a mount that keeps flapping (slow failures
+//     with ok probes in between) becomes Broken once its first failure is
+//     SlowConfirmWindow old, instead of starting a new streak on every ok
+//     probe and never being confirmed.
 //   - failure (not_mountpoint, wrong_fstype, stat_error, stat_timeout,
-//     probe_hung): consecutive failures n = prev.Failures+1 (FirstFailure is
-//     kept; it is set to now when the streak starts). Broken when
+//     probe_hung): failures of the streak n = prev.Failures+1 (FirstFailure is
+//     kept; it is set to now when the streak starts; RecoveringSince is
+//     cleared). Broken when
 //     n >= RecheckAttempts and the class is fast/structural, or the class is
 //     slow and now-FirstFailure >= SlowConfirmWindow; otherwise Suspect.
 //     Once Broken, further failures of any class keep it Broken (Reason
 //     follows the latest class).
 //   - probe_error (or an unknown class): -> Errored with Reason probe_error.
-//     It is "no observation" for debounce purposes: Failures and
-//     FirstFailure are preserved, so a following failure continues the
-//     streak, and Errored never becomes Broken by itself.
+//     It is "no observation" for debounce purposes: Failures, FirstFailure
+//     and RecoveringSince are preserved, so a following failure continues the
+//     streak (and a following ok continues the recovery), and Errored never
+//     becomes Broken by itself.
 //
 // A zero Record (empty State) is treated as Unknown. RecheckAttempts < 1 is
 // treated as 1.
@@ -67,17 +78,23 @@ func Step(prev Record, class hostfs.ProbeClass, now time.Time, cfg Config) (Reco
 	var next Record
 	switch classify(class) {
 	case kindOK:
-		next = Record{State: v1alpha1.HealthHealthy}
+		next = stepOK(prev, now, cfg)
 	case kindProbeError:
 		next = Record{
-			State:        v1alpha1.HealthErrored,
-			Reason:       v1alpha1.ReasonProbeError,
-			FirstFailure: prev.FirstFailure,
-			Failures:     prev.Failures,
-			LastClass:    hostfs.ProbeError,
+			State:           v1alpha1.HealthErrored,
+			Reason:          v1alpha1.ReasonProbeError,
+			FirstFailure:    prev.FirstFailure,
+			Failures:        prev.Failures,
+			LastClass:       hostfs.ProbeError,
+			RecoveringSince: prev.RecoveringSince,
 		}
 		if next.Failures <= 0 {
-			next.Failures, next.FirstFailure = 0, time.Time{}
+			next.Failures, next.FirstFailure, next.RecoveringSince = 0, time.Time{}, time.Time{}
+		}
+		// The streak's class survives a probe_error, so a following ok
+		// still knows the streak was slow.
+		if prev.Failures > 0 && classify(prev.LastClass) != kindProbeError {
+			next.LastClass = prev.LastClass
 		}
 	case kindFast, kindSlow:
 		next = stepFailure(prev, class, now, cfg)
@@ -91,6 +108,30 @@ func Step(prev Record, class hostfs.ProbeClass, now time.Time, cfg Config) (Reco
 		tr.FalseAlarm = prev.State == v1alpha1.HealthSuspect
 	}
 	return next, tr
+}
+
+// stepOK is an ok probe: Healthy, unless a slow streak still has to probe ok
+// for SlowRecoveryWindow (see Step).
+func stepOK(prev Record, now time.Time, cfg Config) Record {
+	if cfg.SlowRecoveryWindow <= 0 || prev.State == v1alpha1.HealthBroken ||
+		prev.Failures <= 0 || classify(prev.LastClass) != kindSlow {
+		return Record{State: v1alpha1.HealthHealthy}
+	}
+	since := prev.RecoveringSince
+	if since.IsZero() {
+		since = now
+	}
+	if now.Sub(since) >= cfg.SlowRecoveryWindow {
+		return Record{State: v1alpha1.HealthHealthy}
+	}
+	return Record{
+		State:           v1alpha1.HealthSuspect,
+		Reason:          Reason(prev.LastClass),
+		FirstFailure:    prev.FirstFailure,
+		Failures:        prev.Failures,
+		LastClass:       prev.LastClass,
+		RecoveringSince: since,
+	}
 }
 
 func stepFailure(prev Record, class hostfs.ProbeClass, now time.Time, cfg Config) Record {
@@ -136,6 +177,9 @@ func FromStatus(h v1alpha1.Health, r v1alpha1.FailureReason, d *v1alpha1.Debounc
 		if d.FirstFailureTime != nil {
 			rec.FirstFailure = d.FirstFailureTime.Time
 		}
+		if d.RecoveringSince != nil {
+			rec.RecoveringSince = d.RecoveringSince.Time
+		}
 	}
 	return rec
 }
@@ -148,7 +192,7 @@ func (r Record) ToStatus() (v1alpha1.Health, v1alpha1.FailureReason, *v1alpha1.D
 	if h == "" {
 		h = v1alpha1.HealthUnknown
 	}
-	if r.Failures == 0 && r.FirstFailure.IsZero() && r.LastClass == "" {
+	if r.Failures == 0 && r.FirstFailure.IsZero() && r.LastClass == "" && r.RecoveringSince.IsZero() {
 		return h, r.Reason, nil
 	}
 	d := &v1alpha1.Debounce{
@@ -158,6 +202,10 @@ func (r Record) ToStatus() (v1alpha1.Health, v1alpha1.FailureReason, *v1alpha1.D
 	if !r.FirstFailure.IsZero() {
 		t := metav1.NewTime(r.FirstFailure)
 		d.FirstFailureTime = &t
+	}
+	if !r.RecoveringSince.IsZero() {
+		t := metav1.NewTime(r.RecoveringSince)
+		d.RecoveringSince = &t
 	}
 	return h, r.Reason, d
 }

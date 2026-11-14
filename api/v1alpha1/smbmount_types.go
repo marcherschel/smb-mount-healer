@@ -32,6 +32,12 @@ type Debounce struct {
 	ConsecutiveFailures int32 `json:"consecutiveFailures"`
 	// +optional
 	LastClass FailureReason `json:"lastClass,omitempty"`
+	// RecoveringSince is the first successful probe after the last failure of
+	// a slow (stat_timeout, probe_hung) streak. The mount stays Suspect, and
+	// the streak keeps counting, until it has probed fine for
+	// SLOW_RECOVERY_WINDOW.
+	// +optional
+	RecoveringSince *metav1.Time `json:"recoveringSince,omitempty"`
 }
 
 // GlobalmountStatus is the live state of the staging mount.

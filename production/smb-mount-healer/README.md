@@ -250,6 +250,7 @@ Kubernetes: `>=1.31.0-0`
 | worker.probing.recheckDelay | string | `"3s"` | `RECHECK_DELAY`: delay between rechecks of a failing mount. |
 | worker.probing.statTimeout | string | `"5s"` | `STAT_TIMEOUT`: a stat slower than this counts as hung. Must be shorter than `checkInterval`. |
 | worker.probing.slowConfirmWindow | string | `"3m"` | `SLOW_CONFIRM_WINDOW`: slow failures (`stat_timeout`, `probe_hung`) must last this long before a mount is Broken. |
+| worker.probing.slowRecoveryWindow | string | `"2m"` | `SLOW_RECOVERY_WINDOW`: after slow failures a mount stays Suspect until it has probed fine for this long; a failure in between continues the streak, so a mount that keeps flapping becomes Broken after `slowConfirmWindow`. `0s`: the first good probe ends the streak. |
 | worker.probing.podStartupGrace | string | `"60s"` | `POD_STARTUP_GRACE`: mounts of pods younger than this are not judged. |
 | worker.probing.startupGrace | string | `"10s"` | `STARTUP_GRACE`: delay after worker start before the first probe round. |
 | worker.probing.probeConcurrency | int | `4` | `PROBE_CONCURRENCY`: parallel probes per node. |

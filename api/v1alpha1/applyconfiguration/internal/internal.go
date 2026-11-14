@@ -59,6 +59,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastClass
       type:
         namedType: com.github.marcherschel.smb-mount-healer.api.v1alpha1.FailureReason
+    - name: recoveringSince
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
 - name: com.github.marcherschel.smb-mount-healer.api.v1alpha1.DriverRestart
   map:
     fields:

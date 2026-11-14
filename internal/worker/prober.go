@@ -80,7 +80,9 @@ type nodeSnapshot struct {
 // ProberRunnable builds the node inventory, probes due mounts with bounded
 // concurrency, advances the health FSM and hands a snapshot to the
 // SmbMountPublisher. Cadence: CHECK_INTERVAL for settled mounts,
-// RECHECK_DELAY while a failure streak is being confirmed, immediately for
+// RECHECK_DELAY while a failure streak is being confirmed (or a slow one
+// waits out SLOW_RECOVERY_WINDOW, so a flapping mount is caught failing
+// again), immediately for
 // new targets and ProbeNow requests. Debounce state is rehydrated from the
 // node's SmbMounts before the first round.
 type ProberRunnable struct {
@@ -109,8 +111,12 @@ type ProberRunnable struct {
 
 func newProber(w *Worker) *ProberRunnable {
 	p := &ProberRunnable{
-		w:        w,
-		hcfg:     health.Config{RecheckAttempts: w.cfg.RecheckAttempts, SlowConfirmWindow: w.cfg.SlowConfirmWindow},
+		w: w,
+		hcfg: health.Config{
+			RecheckAttempts:    w.cfg.RecheckAttempts,
+			SlowConfirmWindow:  w.cfg.SlowConfirmWindow,
+			SlowRecoveryWindow: w.cfg.SlowRecoveryWindow,
+		},
 		hard:     newSignal(),
 		soft:     newSignal(),
 		states:   map[string]*targetState{},
