@@ -57,6 +57,9 @@ func BaselineTimeout() time.Duration {
 //   - no SmbQuarantine, unless the test opted in with AllowQuarantines;
 //   - the worker quiet: no stat_timeout/probe_hung check for BaselineQuietWindow.
 //
+// The first call of a test then resets the remediation history (resetHistory),
+// so remediations that finished while it waited do not count as the test's.
+//
 // The last point matters on newer kernels (6.17 on the hosted runner): after
 // a slow-server fault a CIFS connection can stay wedged for minutes, so its
 // mounts flap Suspect/Healthy and every prober round runs into STAT_TIMEOUT.
@@ -72,6 +75,12 @@ func (f *F) WaitBaseline() {
 		"cluster did not return to baseline")
 	if d := time.Since(start); d > 2*BaselineQuietWindow {
 		f.Logf("baseline reached after %s", d.Round(time.Second))
+	}
+	// Tests call WaitBaseline first thing, before they inject anything; later
+	// calls (mid-test, cleanup) keep the test's own remediations.
+	if !f.baselined {
+		f.baselined = true
+		f.resetHistory()
 	}
 }
 

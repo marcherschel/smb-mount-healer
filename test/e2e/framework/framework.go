@@ -80,8 +80,11 @@ type F struct {
 	allowQuarantines bool
 	clearQuarantines bool
 	// remediationsAtStart are the SmbMountRemediation names that existed
-	// when the test started; WaitRemediation only looks at newer ones.
+	// when the test started (New, then again after its first WaitBaseline);
+	// WaitRemediation only looks at newer ones.
 	remediationsAtStart map[string]bool
+	// baselined: the test's first WaitBaseline returned (see resetHistory).
+	baselined bool
 }
 
 // The suite only uses controller-runtime's client; silence its logger.
@@ -152,11 +155,7 @@ func New(t *testing.T, opts ...Option) *F {
 	f.Landmine = &Samba{f: f, Name: "samba-landmine"}
 	f.Fixtures = &Fixtures{f: f}
 
-	f.forgetHistory()
-	f.remediationsAtStart = map[string]bool{}
-	for _, r := range f.Remediations() {
-		f.remediationsAtStart[r.Name] = true
-	}
+	f.resetHistory()
 
 	t.Cleanup(f.WaitBaseline)
 	if f.clearQuarantines {
@@ -164,6 +163,21 @@ func New(t *testing.T, opts ...Option) *F {
 		t.Cleanup(f.RemoveQuarantineFolders)
 	}
 	return f
+}
+
+// resetHistory deletes the terminal remediations of earlier tests
+// (forgetHistory) and records the remaining ones as existing before this
+// test. New calls it, and the test's first WaitBaseline calls it again: a
+// remediation an earlier test left behind can still start and finish while
+// that WaitBaseline waits (a mount flapping after S3 netem became Broken
+// during S4's baseline wait, and S4 took its remediation for its own).
+func (f *F) resetHistory() {
+	f.T.Helper()
+	f.forgetHistory()
+	f.remediationsAtStart = map[string]bool{}
+	for _, r := range f.Remediations() {
+		f.remediationsAtStart[r.Name] = true
+	}
 }
 
 func restConfig() (*rest.Config, error) {
