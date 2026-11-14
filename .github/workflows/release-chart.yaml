@@ -1,28 +1,44 @@
 name: release-chart
 
-# Chart release: pushing a tag chart-vA.B.C (or chart-vA.B.C-rc.N) publishes
-# the chart exactly as committed (Chart.yaml `version` must be A.B.C):
+# Chart release, started by hand (Actions -> release-chart -> Run workflow on
+# main) with the kind of release; the version is never typed or bumped by hand:
+#   bump: patch|minor|major  next stable version after the latest stable
+#                            chart-v* tag (prerelease: its next -rc.N instead)
+#         rc                 next candidate of the open release candidate line
+# (hack/next-version.sh). The workflow then creates the release commit on top
+# of main (hack/stamp-chart.sh): Chart.yaml `version`, `appVersion` pinned to
+# the latest stable app release (newest vX.Y.Z tag without suffix), the
+# artifacthub.io/images tag and prerelease flag, and artifacthub.io/changes
+# without the entries the previous release already listed. It runs the chart
+# checks on that commit, tags it chart-vA.B.C (the commit is reachable only
+# from the tag; main keeps its placeholder version) and publishes it:
 #   oci://ghcr.io/<owner>/charts/smb-mount-healer:A.B.C
 #   ghcr.io/<owner>/charts/smb-mount-healer:artifacthub.io  ArtifactHub repository
 #                                    metadata (production/smb-mount-healer/artifacthub-repo.yml)
 #   GitHub release chart-vA.B.C with dist/chart (make dist-chart): chart
 #   package, Grafana dashboard, Prometheus rule file, PrometheusRule, SHA256SUMS.
-# The chart's appVersion must be a published app release (tags v*,
-# release-app.yaml). Chart checks gate every publish step: chart lint and
-# tests (helm, kubeconform, promtool) and the dashboard/alert metric names.
-# The Go suite (unit, envtest, e2e) never runs here; it gates the app release.
-# A manual run (workflow_dispatch, input tag) releases an existing chart tag
-# again, for example after a failed run.
+# Chart checks gate every publish step: chart lint and tests (helm,
+# kubeconform, promtool) and the dashboard/alert metric names. The Go suite
+# (unit, envtest, e2e) never runs here; it gates the app release.
+# With input `tag`, an existing chart tag is released again (for example after
+# a failed run); `bump` is ignored then.
 
 on:
-  push:
-    tags: ["chart-v[0-9]+.[0-9]+.[0-9]+", "chart-v[0-9]+.[0-9]+.[0-9]+-*"]
   workflow_dispatch:
     inputs:
+      bump:
+        description: "Release kind: patch|minor|major (from the latest stable chart release) or rc (next candidate of the open release candidate)"
+        type: choice
+        options: [patch, minor, major, rc]
+        default: patch
+      prerelease:
+        description: "With patch|minor|major: release the next release candidate (-rc.N) of that version instead"
+        type: boolean
+        default: false
       tag:
-        description: "Existing chart tag to release (chart-vA.B.C or chart-vA.B.C-rc.N)"
+        description: "Optional: release this existing chart tag again (chart-vA.B.C[-rc.N]) instead of a new version"
         type: string
-        required: true
+        default: ""
 
 permissions:
   contents: read
@@ -32,8 +48,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # The chart tag: the pushed tag, or the manual run's input.
-  TAG: ${{ inputs.tag || github.ref_name }}
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: safe.directory
   GIT_CONFIG_VALUE_0: "*"
@@ -43,28 +57,84 @@ defaults:
     shell: bash
 
 jobs:
-  chart-checks:
-    name: Chart checks
+  prepare:
+    name: Release commit + chart checks
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # push the release tag
       packages: read # pull the CI image from GHCR
     container:
       image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
       # make chart-test runs the pinned kubeconform and promtool images.
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.sha }}
+          fetch-depth: 0 # tags: next version, latest app release, previous changes
 
-      - name: Tag exists and is a chart tag
+      # New release: next version from the tags, release commit stamped on top
+      # of main. Existing tag: checked out as is.
+      - name: Version and release commit
+        id: plan
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          BUMP: ${{ inputs.bump }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
-          if [[ ! "$TAG" =~ ^chart-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::tag ${TAG} is not chart-vA.B.C[-pre]"
+          chart=production/smb-mount-healer
+          if [ -n "$INPUT_TAG" ]; then
+            if [[ ! "$INPUT_TAG" =~ ^chart-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::tag ${INPUT_TAG} is not chart-vA.B.C[-pre]"
+              exit 1
+            fi
+            echo "release existing tag ${INPUT_TAG}"
+            echo "tag=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::new chart releases are cut from main (run the workflow on main, not ${GITHUB_REF})"
             exit 1
           fi
+          version=$(hack/next-version.sh chart "$BUMP" "$PRERELEASE")
+          tag="chart-v${version}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "::error::tag ${tag} already exists"
+            exit 1
+          fi
+          # The chart always deploys the latest stable app release.
+          app_tag=$(git -c versionsort.suffix=- tag -l 'v[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+          if [ -z "$app_tag" ]; then
+            echo "::error::no stable app release (vX.Y.Z) yet; release the app first"
+            exit 1
+          fi
+          # Changes are listed since the previous stable release (a release
+          # also lists what its candidates had), a candidate's since the
+          # previous chart release of any kind.
+          if [[ "$version" == *-* ]]; then
+            previous=$(git -c versionsort.suffix=- tag -l 'chart-v[0-9]*' --sort=-v:refname | head -1 || true)
+          else
+            previous=$(git -c versionsort.suffix=- tag -l 'chart-v[0-9]*' --sort=-v:refname | grep -E '^chart-v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+          fi
+          hack/stamp-chart.sh "$version" "${app_tag#v}" "$previous"
+          # Refuse a release identical to the previous one (apart from the
+          # stamped version fields).
+          if [ -n "$previous" ]; then
+            strip='del(.version) | del(.annotations."artifacthub.io/prerelease") | del(.annotations."artifacthub.io/changes")'
+            if git diff --quiet "$previous" -- "$chart" ":(exclude)${chart}/Chart.yaml" &&
+              [ "$(git show "${previous}:${chart}/Chart.yaml" | yq "$strip")" = "$(yq "$strip" "${chart}/Chart.yaml")" ]; then
+              echo "::error::the chart did not change since ${previous}; nothing to release"
+              exit 1
+            fi
+          fi
+          git diff
+          echo "release ${tag} (appVersion ${app_tag#v}, changes since ${previous:-the start})"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "new=true" >> "$GITHUB_OUTPUT"
 
       # helm lint --strict + helm template/kubeconform/promtool/yq assertions
       # for every ci/*-values.yaml (hack/chart-test.sh).
@@ -74,9 +144,23 @@ jobs:
       - name: Dashboard and alerts use existing metric names
         run: hack/check-dashboard-metrics.sh
 
+      # The release commit is reachable only from its tag (main accepts pull
+      # requests only, and its Chart.yaml version stays a placeholder).
+      - name: Commit and tag the release
+        if: steps.plan.outputs.new == 'true'
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -am "chore(chart): release ${TAG#chart-v}"
+          git -c tag.gpgSign=false tag -a "$TAG" -m "$TAG"
+          git push origin "refs/tags/${TAG}"
+          echo "pushed ${TAG} -> $(git rev-parse HEAD) (parent ${GITHUB_SHA})"
+
   publish:
     name: Chart
-    needs: chart-checks
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -87,12 +171,13 @@ jobs:
       version: ${{ steps.check.outputs.version }}
       digest: ${{ steps.push.outputs.digest }}
     env:
+      TAG: ${{ needs.prepare.outputs.tag }}
       IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/smb-mount-healer
       CHART_REPO: ghcr.io/${{ github.repository_owner }}/charts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: refs/tags/${{ needs.prepare.outputs.tag }}
 
       - name: Log in to GHCR (helm, oras)
         env:
@@ -115,7 +200,7 @@ jobs:
           fi
           # GHCR lets a tag be overwritten, so refuse to re-push a version.
           if oras manifest fetch "${CHART_REPO}/smb-mount-healer:${version}" >/dev/null 2>&1; then
-            echo "::error::chart smb-mount-healer ${version} is already published; bump Chart.yaml version"
+            echo "::error::chart smb-mount-healer ${version} is already published; release a new version instead"
             exit 1
           fi
           if ! oras manifest fetch "${IMAGE_REPO}:${app_version}" >/dev/null; then
@@ -181,14 +266,16 @@ jobs:
 
   github-release:
     name: GitHub release
-    needs: [publish, sign]
+    needs: [prepare, publish, sign]
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: refs/tags/${{ needs.prepare.outputs.tag }}
           fetch-depth: 0 # previous chart tag for the release notes
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -214,7 +301,7 @@ jobs:
             echo '```'
             echo
             echo "### Changes"
-            yq '.annotations."artifacthub.io/changes"' "$chart" | yq '.[] | "- " + .kind + ": " + .description'
+            yq '.annotations."artifacthub.io/changes" // "[]"' "$chart" | yq '.[] | "- " + .kind + ": " + .description'
           } >"$notes"
           flags=(--generate-notes --verify-tag --notes-file "$notes")
           previous=$(git -c versionsort.suffix=- tag -l 'chart-v*' --sort=-v:refname | grep -vx "$TAG" | head -1 || true)

@@ -36,6 +36,3 @@ jobs:
         env:
           RENOVATE_TOKEN: ${{ steps.octo-sts.outputs.token }}
           RENOVATE_REPOSITORIES: ${{ github.repository }}
-          # postUpgradeTasks in renovate.json: bump the chart version when an
-          # app release moves the chart's appVersion.
-          RENOVATE_ALLOWED_POST_UPGRADE_COMMANDS: '["^hack/bump-chart-version\\.sh (patch|minor|major) "]'

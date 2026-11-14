@@ -31,13 +31,23 @@ which transitions changed.
 ## Releasing
 
 The app (binary + image) and the chart are released independently, from
-different tags in this repository:
+different tags in this repository. Nobody picks or bumps a version by hand:
+both releases are started from the Actions tab (Run workflow, on `main`)
+with the kind of release, and the workflow computes the version from the
+existing tags (`hack/next-version.sh`):
+
+| Input | Next version (example: latest stable 0.1.4) |
+|---|---|
+| `bump: patch` / `minor` / `major` | `0.1.5` / `0.2.0` / `1.0.0`; promotes an open release candidate of that version |
+| ... with `prerelease` | `0.1.5-rc.1` / `0.2.0-rc.1` / `1.0.0-rc.1` (or the next `-rc.N` of that version) |
+| `bump: rc` | the next candidate of the open release candidate line (`0.2.0-rc.1` -> `0.2.0-rc.2`); fails if none is open |
+| `tag: <existing tag>` | releases that existing tag again (for example after a failed run); `bump` is ignored |
 
 | | App | Chart |
 |---|---|---|
 | Tag | `vX.Y.Z` | `chart-vA.B.C` |
 | Workflow | `.github/workflows/release-app.yaml` | `.github/workflows/release-chart.yaml` |
-| Version source | the tag | `version` in `production/smb-mount-healer/Chart.yaml` (the tag must match) |
+| Tag points at | the `main` commit, created once the CI suite passed on it | a release commit on top of `main` with the stamped `Chart.yaml` (reachable only from the tag) |
 | Publishes | `ghcr.io/marcherschel/smb-mount-healer:X.Y.Z`; GitHub release with static binaries, CRDs, `SHA256SUMS` (`make dist-app`) | `oci://ghcr.io/marcherschel/charts/smb-mount-healer` A.B.C; GitHub release with chart package, dashboard, rules, PrometheusRule, `SHA256SUMS` (`make dist-chart`) |
 
 The app release runs the full CI suite first (unless skipped, see below);
@@ -46,42 +56,43 @@ pre-release suffix (`-rc.1`, ...) are marked as prereleases. App releases
 become the repository's "Latest" release on GitHub (they carry the binaries
 and CRDs); chart releases never do, since the chart is installed from the
 OCI registry. Both workflows sign what they publish with cosign (keyless,
-GitHub OIDC). Both can be started by hand for an existing tag (input `tag`)
-to release it again.
+GitHub OIDC).
 
 ### App release
 
-1. Tag the commit on `main`: `git tag -s v0.2.0 -m v0.2.0 && git push origin v0.2.0`
-   (`v0.2.0-rc.1` for a release candidate).
-   To publish without running the CI suite first (the commit already
-   passed it in its PR), put `[skip tests]` into the tag message:
-   `git tag -s v0.2.0 -m "v0.2.0 [skip tests]"`. A manual run of
-   `release-app.yaml` (inputs `tag`, `skip_tests`) releases an existing tag
-   again, for example after a failed run. The GitHub release notes say
-   when the tests were skipped.
-2. Renovate then opens a PR that moves the chart's `appVersion` (and the
-   `artifacthub.io/images` tag) to the new release, bumps the chart
-   `version` by a patch and adds a `changed` entry to
-   `artifacthub.io/changes` (`hack/bump-chart-version.sh`). Merge it, then
-   release the chart.
+1. Run `release-app` on `main` with `bump` (and `prerelease` for a release
+   candidate). It runs the CI suite on the `main` commit; only when it
+   passes does it create the tag (so a failed run leaves no tag, and the
+   next run computes the same version) and publish. `skip_tests` publishes
+   without running the suite first (the commit already passed it in its
+   PR); the GitHub release notes say so. Pushing a tag yourself
+   (`git tag -s v0.2.0 -m v0.2.0 && git push origin v0.2.0`, with
+   `[skip tests]` in the message to skip the suite) still works.
+2. Renovate then moves the chart's `appVersion` (and the
+   `artifacthub.io/images` tag) on `main` to the new release. The next chart
+   release pins the latest stable app release either way.
 
 ### Chart release
 
-Every change below `production/smb-mount-healer/` needs a higher chart
-`version` than the last `chart-v*` tag; CI enforces this
-(`hack/check-chart-version.sh`). Bump it in your PR with
-`hack/bump-chart-version.sh patch|minor|major`.
+`Chart.yaml` `version` on `main` is a placeholder (`0.0.0-dev`) and is never
+bumped in PRs. Do add an `artifacthub.io/changes` entry with every chart
+change (and set `artifacthub.io/containsSecurityUpdates: "true"` if the
+release fixes a vulnerability); entries an earlier release already listed
+are dropped automatically, so they never have to be cleaned up.
 
-1. Curate `artifacthub.io/changes` in `Chart.yaml` for this version (only
-   the changes since the last chart release). Set
-   `artifacthub.io/containsSecurityUpdates: "true"` if the release fixes a
-   vulnerability. Merge to `main`.
-2. Tag: `git tag -s chart-v0.2.0 -m chart-v0.2.0 && git push origin chart-v0.2.0`.
-3. The workflow runs the chart checks only (chart lint/test, dashboard and
-   alert metric names; the Go suite gates the app release, not the chart).
-   It refuses the tag if it differs from `Chart.yaml` `version`,
-   if that version is already published, or if the image for `appVersion`
-   does not exist.
+1. Run `release-chart` on `main` with `bump` (and `prerelease` for a
+   release candidate).
+2. The workflow stamps the release commit (`hack/stamp-chart.sh`):
+   `version`, `appVersion` pinned to the latest stable app release (newest
+   `vX.Y.Z` tag without suffix), the `artifacthub.io/images` tag,
+   `artifacthub.io/prerelease`, and `artifacthub.io/changes` without the
+   entries of the previous release (plus a "Default image" entry when
+   `appVersion` moved). It refuses to release a chart identical to the
+   previous release.
+3. It runs the chart checks on that commit (chart lint/test, dashboard and
+   alert metric names; the Go suite gates the app release, not the chart),
+   tags it `chart-vA.B.C` and publishes. It refuses a version that is
+   already published, or an `appVersion` whose image does not exist.
 
 When a change needs both (for example a new setting in the binary and the
 chart), release the app first and the chart after it.

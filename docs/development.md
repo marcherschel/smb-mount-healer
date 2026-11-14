@@ -35,7 +35,6 @@ pinned golangci-lint and helm into `bin/` when the installed version differs.
 | `image` | `docker buildx` of `$(IMG)` (default `ghcr.io/marcherschel/smb-mount-healer:$(VERSION)`). Native single-arch `--load` by default; multi-arch push: `PLATFORMS=linux/amd64,linux/arm64 IMAGE_OUTPUT=--push`. |
 | `dist-app` | app release assets into `dist/app` for `VERSION`: static binaries (`RELEASE_PLATFORMS`), CRDs, `SHA256SUMS` (`hack/dist-app.sh`) |
 | `dist-chart` | chart release assets into `dist/chart`: package as committed, dashboard, rules, PrometheusRule, `SHA256SUMS` (`hack/dist-chart.sh`) |
-| `check-chart-version` | fail if the chart changed since the last `chart-v*` tag without a higher `Chart.yaml` version |
 | `e2e` | the e2e suite on a throwaway k3d cluster, always deleted afterwards |
 | `e2e-up` / `e2e-run` / `e2e-dev` / `e2e-down` | k3d cluster `smbmh-e2e` (`rancher/k3s:K3S_VERSION`); `e2e-run` = `tilt ci` environment setup on `test/e2e/Tiltfile` (healer via the Helm chart) + `go test` suite; `e2e-dev` = `tilt up` |
 | `tools` | install the pinned CLI tools (`hack/tools/install.sh`) |
