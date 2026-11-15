@@ -44,6 +44,10 @@ annotations:
       url: https://github.com/marcherschel/smb-mount-healer/blob/main/docs/architecture.md
     - name: support
       url: https://github.com/marcherschel/smb-mount-healer/issues
+    - name: SBOMs (latest app release)
+      url: https://github.com/marcherschel/smb-mount-healer/releases/latest
+    - name: Verifying signatures and SBOMs
+      url: https://github.com/marcherschel/smb-mount-healer/blob/main/SECURITY.md#verifying-a-release
   artifacthub.io/recommendations: |
     - url: https://artifacthub.io/packages/helm/csi-driver-smb/csi-driver-smb
   artifacthub.io/screenshots: |
@@ -52,6 +56,8 @@ annotations:
     - title: Grafana dashboard (monitoring.grafanaDashboard)
       url: https://raw.githubusercontent.com/marcherschel/smb-mount-healer/main/docs/demo/grafana-dashboard.png
   artifacthub.io/changes: |
+    - kind: added
+      description: App releases ship SBOMs (image per platform, binaries in SPDX and CycloneDX); linked from ArtifactHub.
     - kind: changed
       description: Licensed under Apache-2.0 (was GPL-2.0-only).
     - kind: changed
