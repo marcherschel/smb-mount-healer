@@ -94,6 +94,8 @@ spec:
               value: {{ $p.statTimeout | quote }}
             - name: SLOW_CONFIRM_WINDOW
               value: {{ $p.slowConfirmWindow | quote }}
+            - name: SLOW_RECOVERY_WINDOW
+              value: {{ $p.slowRecoveryWindow | quote }}
             - name: POD_STARTUP_GRACE
               value: {{ $p.podStartupGrace | quote }}
             - name: STARTUP_GRACE

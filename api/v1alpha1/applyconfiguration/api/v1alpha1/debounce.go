@@ -16,6 +16,11 @@ type DebounceApplyConfiguration struct {
 	FirstFailureTime    *v1.Time                   `json:"firstFailureTime,omitempty"`
 	ConsecutiveFailures *int32                     `json:"consecutiveFailures,omitempty"`
 	LastClass           *apiv1alpha1.FailureReason `json:"lastClass,omitempty"`
+	// RecoveringSince is the first successful probe after the last failure of
+	// a slow (stat_timeout, probe_hung) streak. The mount stays Suspect, and
+	// the streak keeps counting, until it has probed fine for
+	// SLOW_RECOVERY_WINDOW.
+	RecoveringSince *v1.Time `json:"recoveringSince,omitempty"`
 }
 
 // DebounceApplyConfiguration constructs a declarative configuration of the Debounce type for use with
@@ -45,5 +50,13 @@ func (b *DebounceApplyConfiguration) WithConsecutiveFailures(value int32) *Debou
 // If called multiple times, the LastClass field is set to the value of the last call.
 func (b *DebounceApplyConfiguration) WithLastClass(value apiv1alpha1.FailureReason) *DebounceApplyConfiguration {
 	b.LastClass = &value
+	return b
+}
+
+// WithRecoveringSince sets the RecoveringSince field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RecoveringSince field is set to the value of the last call.
+func (b *DebounceApplyConfiguration) WithRecoveringSince(value v1.Time) *DebounceApplyConfiguration {
+	b.RecoveringSince = &value
 	return b
 }

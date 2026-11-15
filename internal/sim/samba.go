@@ -22,10 +22,23 @@ const (
 	ServerPaused ServerState = "paused"
 	// ServerSlow answers slower than STAT_TIMEOUT (stat_timeout, never hung).
 	ServerSlow ServerState = "slow"
+	// ServerFlapping is the cifs client left degraded after e2e S3 netem:
+	// requests time out for flapSlow of every flapPeriod and are fine in
+	// between, until the share is remounted (the scenario sets ServerUp).
+	ServerFlapping ServerState = "flapping"
 )
 
 // pausedHungAfter is how long a paused server takes to wedge a probe child.
 const pausedHungAfter = 10 * time.Second
+
+// A flapping server times out for the first flapSlow of every flapPeriod.
+// The ok gaps (20s) are shorter than SLOW_RECOVERY_WINDOW and longer than
+// CHECK_INTERVAL in the cadence scenarios (5s), like the 10-55s gaps of the
+// e2e runs.
+const (
+	flapPeriod = 30 * time.Second
+	flapSlow   = 10 * time.Second
+)
 
 type server struct {
 	state ServerState
@@ -89,7 +102,7 @@ func (s *Samba) gens() map[string]int {
 // server makes mount(2) hang until kubelet's operation times out).
 func (s *Samba) canMount(name string) bool {
 	st := s.server(name).state
-	return st == ServerUp || st == ServerSlow
+	return st == ServerUp || st == ServerSlow || st == ServerFlapping
 }
 
 // classify is the probe outcome of a cifs session on server established at gen.
@@ -110,6 +123,11 @@ func (s *Samba) classify(name string, gen int) (hostfs.ProbeClass, bool) {
 		return hostfs.ProbeStatTimeout, false
 	case ServerSlow:
 		return hostfs.ProbeStatTimeout, false
+	case ServerFlapping:
+		if s.w.Now().Sub(sv.since)%flapPeriod < flapSlow {
+			return hostfs.ProbeStatTimeout, false
+		}
+		return hostfs.ProbeOK, false
 	}
 	return hostfs.ProbeStatError, false
 }

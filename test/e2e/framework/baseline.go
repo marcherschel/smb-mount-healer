@@ -67,12 +67,29 @@ func BaselineTimeout() time.Duration {
 // a degraded worker (slow probe rounds), which the 6.8 client never shows.
 func (f *F) WaitBaseline() {
 	f.T.Helper()
+	if f.baselineFailed {
+		// The test already failed waiting for the baseline; a second full
+		// wait in its cleanup would only burn another BaselineTimeout (S3
+		// netem left a flapping share behind: every later test spent
+		// 2 x 10m and hit its 20m timeout).
+		f.Logf("skipping baseline wait: it already failed in this test")
+		return
+	}
 	start := time.Now()
-	f.G.Eventually(func(g gomega.Gomega) {
+	failure := ""
+	g := gomega.NewGomega(func(msg string, _ ...int) { failure = msg })
+	g.Eventually(func(g gomega.Gomega) {
 		g.Expect(f.baselineProblems()).To(gomega.BeEmpty())
 		g.Expect(f.workerQuiet()).To(gomega.Succeed())
 	}).WithTimeout(BaselineTimeout()).WithPolling(3*time.Second).Should(gomega.Succeed(),
 		"cluster did not return to baseline")
+	if failure != "" {
+		f.baselineFailed = true
+		// Unindented on stdout so hack/go-test.sh can count tests that
+		// could not reach the baseline (E2E_MAX_BASELINE_FAILURES).
+		fmt.Printf("%s %s after %s\n", BaselineNotReachedMarker, f.T.Name(), time.Since(start).Round(time.Second))
+		f.T.Fatal(failure)
+	}
 	if d := time.Since(start); d > 2*BaselineQuietWindow {
 		f.Logf("baseline reached after %s", d.Round(time.Second))
 	}
@@ -83,6 +100,11 @@ func (f *F) WaitBaseline() {
 		f.resetHistory()
 	}
 }
+
+// BaselineNotReachedMarker starts the stdout line WaitBaseline prints when
+// the cluster did not return to baseline. hack/go-test.sh matches it
+// literally; keep both in sync.
+const BaselineNotReachedMarker = "=== BASELINE NOT REACHED:"
 
 // BaselineQuietWindow is how long the worker must go without a slow probe
 // (stat_timeout/probe_hung) for WaitBaseline: longer than CHECK_INTERVAL of

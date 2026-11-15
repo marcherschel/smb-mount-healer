@@ -1,0 +1,46 @@
+{"t":"00:02:00","kind":"baseline","msg":"Deployment/apps/deploy-single=1"}
+{"t":"00:02:10","kind":"inject","msg":"cifs client degraded: slow 10s of every 30s"}
+{"t":"00:02:10","kind":"samba","obj":"samba.e2e.svc.cluster.local","from":"up","to":"flapping"}
+{"t":"00:02:14","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:02:20","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:02:40","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:02:52","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:03:12","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:03:21","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:03:41","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:03:50","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:04:10","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:04:22","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:04:42","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:04:51","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:05:11","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:05:20","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:05:40","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:05:52","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:06:12","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:06:21","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:06:41","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:06:50","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:07:10","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:07:22","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:07:42","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:07:51","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:08:11","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:08:20","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:08:40","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:08:52","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:09:12","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:09:21","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:09:41","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:09:50","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:10:10","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:10:22","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:10:42","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:10:51","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:11:11","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:11:20","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:11:40","kind":"smbm","obj":"n1.config-a","msg":"Suspect(stat_timeout) gm=cifs pods=[deploy-single-5d8f7c9b6-001:Suspect(stat_timeout)]"}
+{"t":"00:11:52","kind":"smbm","obj":"n1.config-a","msg":"Healthy gm=cifs pods=[deploy-single-5d8f7c9b6-001:Healthy]"}
+{"t":"00:12:00","kind":"result","msg":"outcomes=[] healed=true"}
+{"t":"00:12:00","kind":"replicas","msg":"Deployment/apps/deploy-single=1/1"}
+{"t":"00:12:00","kind":"metrics","msg":"false_alarms_total{kind=globalmount,node=n1,reason=stat_timeout}=20 false_alarms_total{kind=pod,node=n1,reason=stat_timeout}=20 probes_hung{node=n1}=0"}

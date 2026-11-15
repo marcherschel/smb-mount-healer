@@ -9,6 +9,7 @@ import (
 
 	"github.com/marcherschel/smb-mount-healer/api/v1alpha1"
 	"github.com/marcherschel/smb-mount-healer/internal/metrics"
+	"github.com/marcherschel/smb-mount-healer/internal/worker"
 	"github.com/marcherschel/smb-mount-healer/test/e2e/framework"
 )
 
@@ -80,9 +81,9 @@ func TestS16DryRun(t *testing.T) {
 		"workload_actions{mode=live}:\n%s", cp.After.Series(metrics.WorkloadActionsTotal))
 	g.Expect(cp.Get(metrics.RemediationsStartedTotal, metrics.LabelMode, metrics.ModeDryRun)).To(gomega.BeNumerically(">=", 1))
 	g.Expect(cp.Get(metrics.RemediationsTotal, metrics.LabelMode, metrics.ModeDryRun, metrics.LabelOutcome, string(v1alpha1.OutcomeDryRun))).To(gomega.BeNumerically(">=", 1))
-	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelDryRun, "true", metrics.LabelResult, "dry_run")).To(gomega.BeNumerically(">=", 1),
+	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelDryRun, "true", metrics.LabelResult, worker.ResultLabelDryRun)).To(gomega.BeNumerically(">=", 1),
 		"host_actions{dry_run}:\n%s", w.After.Series(metrics.HostActionsTotal))
-	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelDryRun, "true", metrics.LabelResult, "succeeded")).To(gomega.BeZero())
+	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelDryRun, "true", metrics.LabelResult, worker.ResultLabelSucceeded)).To(gomega.BeZero())
 
 	// Back to live mode (the cleanup repeats this idempotently): the gauge drops to 0.
 	f.SetControlPlaneDryRun(false)

@@ -164,7 +164,7 @@ func NewWorld(opts Options) (*World, error) {
 		UnstageWait:                 30 * time.Second,
 		QuarantineUnstageWait:       300 * time.Second,
 		DriverRestartWait:           90 * time.Second,
-		VerifyWait:                  90 * time.Second,
+		VerifyWait:                  3 * time.Minute, // chart default; > SlowRecoveryWindow + RecheckDelay + StatTimeout
 		VerifyNoPodGrace:            30 * time.Second,
 		EpisodeMaxDuration:          30 * time.Minute,
 		BackoffBase:                 5 * time.Minute,
@@ -185,6 +185,7 @@ func NewWorld(opts Options) (*World, error) {
 		StartupGrace:             10 * time.Second,
 		PodStartupGrace:          60 * time.Second,
 		SlowConfirmWindow:        3 * time.Minute,
+		SlowRecoveryWindow:       2 * time.Minute,
 		ProbeConcurrency:         1,
 		StatusHeartbeat:          5 * time.Minute,
 		QuarantineDir:            QuarantineDir,

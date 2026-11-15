@@ -66,13 +66,13 @@
 {"t":"00:04:37","kind":"kubelet","obj":"n1","msg":"stage config-a failed: mount error(112): Host is down (retry in 1m4s)"}
 {"t":"00:04:39","kind":"event","obj":"SmbMount/n1.config-a","reason":"Warning/MountBroken","msg":"pod mount pod(apps/deploy-single-5d8f7c9b6-003,config-a) of pod apps/deploy-single-5d8f7c9b6-003 is Broken (not_mountpoint)","src":"worker/n1"}
 {"t":"00:04:39","kind":"smbm","obj":"n1.config-a","msg":"Broken(not_mountpoint) gm=absent pods=[deploy-single-5d8f7c9b6-003:Broken(not_mountpoint)] quarantines=1 stage=verifying"}
-{"t":"00:05:03","kind":"stage","obj":"n1-1791676996","from":"verifying","to":"finalizing","reason":"verify_timeout"}
-{"t":"00:05:03","kind":"stage","obj":"n1-1791676996","from":"finalizing","to":"done","reason":"finalized"}
-{"t":"00:05:03","kind":"verify","obj":"n1-1791676996","msg":"Deployment/apps/deploy-single=failed"}
-{"t":"00:05:03","kind":"outcome","obj":"n1-1791676996","to":"verify_failed","msg":"verification failed for Deployment/apps/deploy-single"}
-{"t":"00:05:03","kind":"event","obj":"SmbMountRemediation/n1-1791676996","reason":"Warning/RemediationFinished","msg":"outcome verify_failed: verification failed for Deployment/apps/deploy-single","src":"controlplane"}
-{"t":"00:05:03","kind":"smbm","obj":"n1.config-a","msg":"Broken(not_mountpoint) gm=absent pods=[deploy-single-5d8f7c9b6-003:Broken(not_mountpoint)] quarantines=1 last=verify_failed"}
 {"t":"00:05:41","kind":"kubelet","obj":"n1","msg":"stage config-a failed: mount error(112): Host is down (retry in 2m8s)"}
+{"t":"00:06:33","kind":"stage","obj":"n1-1791676996","from":"verifying","to":"finalizing","reason":"verify_timeout"}
+{"t":"00:06:33","kind":"stage","obj":"n1-1791676996","from":"finalizing","to":"done","reason":"finalized"}
+{"t":"00:06:33","kind":"verify","obj":"n1-1791676996","msg":"Deployment/apps/deploy-single=failed"}
+{"t":"00:06:33","kind":"outcome","obj":"n1-1791676996","to":"verify_failed","msg":"verification failed for Deployment/apps/deploy-single"}
+{"t":"00:06:33","kind":"event","obj":"SmbMountRemediation/n1-1791676996","reason":"Warning/RemediationFinished","msg":"outcome verify_failed: verification failed for Deployment/apps/deploy-single","src":"controlplane"}
+{"t":"00:06:33","kind":"smbm","obj":"n1.config-a","msg":"Broken(not_mountpoint) gm=absent pods=[deploy-single-5d8f7c9b6-003:Broken(not_mountpoint)] quarantines=1 last=verify_failed"}
 {"t":"00:07:18","kind":"inject","msg":"samba back"}
 {"t":"00:07:18","kind":"samba","obj":"samba.e2e.svc.cluster.local","from":"down","to":"up"}
 {"t":"00:07:49","kind":"kubelet","obj":"n1","msg":"stage config-a: mounted cifs //samba.e2e.svc.cluster.local/config-a"}

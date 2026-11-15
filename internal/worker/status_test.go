@@ -113,8 +113,9 @@ func TestConditionTransitionTimeKept(t *testing.T) {
 
 func TestFingerprintMatchesRoundTrip(t *testing.T) {
 	recs := map[string]health.Record{
-		"/k/gm": {State: v1alpha1.HealthSuspect, Reason: v1alpha1.ReasonStatError, Failures: 1,
-			FirstFailure: unitNow.Add(123 * time.Millisecond), LastClass: hostfs.ProbeStatError},
+		"/k/gm": {State: v1alpha1.HealthSuspect, Reason: v1alpha1.ReasonStatTimeout, Failures: 1,
+			FirstFailure: unitNow.Add(123 * time.Millisecond), LastClass: hostfs.ProbeStatTimeout,
+			RecoveringSince: unitNow.Add(456 * time.Millisecond)},
 	}
 	st := workerStatus(testVolume(), recs, 0, unitNow, nil, unitNow)
 	b, err := json.Marshal(st)
@@ -198,8 +199,9 @@ func (*concurrencyProber) Hung() int { return 0 }
 
 func newUnitWorker(prober hostfs.Prober) *Worker {
 	w := &Worker{
-		node:  "n",
-		cfg:   config.Worker{CheckInterval: time.Minute, RecheckDelay: 3 * time.Second, RecheckAttempts: 3, ProbeConcurrency: 3, SlowConfirmWindow: time.Minute},
+		node: "n",
+		cfg: config.Worker{CheckInterval: time.Minute, RecheckDelay: 3 * time.Second, RecheckAttempts: 3, ProbeConcurrency: 3, SlowConfirmWindow: time.Minute,
+			SlowRecoveryWindow: time.Minute},
 		host:  Host{Prober: prober},
 		clock: clocktesting.NewFakeClock(unitNow),
 		m:     metrics.NewWorker("n"),
@@ -223,6 +225,49 @@ func TestProbeConcurrencyBounded(t *testing.T) {
 		if st.probedAt.IsZero() || st.result.Class != hostfs.ProbeOK {
 			t.Fatalf("not probed: %+v", st)
 		}
+	}
+}
+
+// TestRecoveringPersistedAndRechecked: a slow streak waiting out
+// SLOW_RECOVERY_WINDOW is applied with debounce.recoveringSince (so a worker
+// restart keeps it) and probed every RECHECK_DELAY, so a flapping mount is
+// caught failing again.
+func TestRecoveringPersistedAndRechecked(t *testing.T) {
+	w := newUnitWorker(&concurrencyProber{})
+	st := &targetState{
+		target: inventory.ProbeTarget{Path: "/k/gm", PVName: "pv", Kind: v1alpha1.MountKindGlobalmount},
+		rec: health.Record{State: v1alpha1.HealthSuspect, Reason: v1alpha1.ReasonStatTimeout, Failures: 2,
+			FirstFailure: unitNow.Add(-10 * time.Second), LastClass: hostfs.ProbeStatTimeout},
+		probedAt: unitNow,
+		result:   hostfs.ProbeResult{Class: hostfs.ProbeOK},
+	}
+	if tr := w.Prober.step(logr.Discard(), st, indexView(inventory.NodeView{})); tr != nil {
+		t.Fatalf("recovering must not transition: %+v", tr)
+	}
+	if !st.rec.Recovering() || st.rec.State != v1alpha1.HealthSuspect {
+		t.Fatalf("record: %+v", st.rec)
+	}
+	if !st.nextDue.Equal(unitNow.Add(3 * time.Second)) {
+		t.Fatalf("recovering mounts are rechecked after RECHECK_DELAY: %v", st.nextDue)
+	}
+	if v := metricValue(w.m.FalseAlarms.WithLabelValues("globalmount", "stat_timeout")); v != 0 {
+		t.Fatalf("false alarms = %v", v)
+	}
+
+	b, err := json.Marshal(statusApply(workerStatus(testVolume(), map[string]health.Record{"/k/gm": st.rec}, 0, unitNow, nil, unitNow)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Debounce struct {
+			RecoveringSince *metav1.Time `json:"recoveringSince"`
+		} `json:"debounce"`
+	}
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.Debounce.RecoveringSince == nil || !m.Debounce.RecoveringSince.Time.Equal(unitNow.Truncate(time.Second)) {
+		t.Fatalf("apply must carry debounce.recoveringSince: %s", b)
 	}
 }
 
