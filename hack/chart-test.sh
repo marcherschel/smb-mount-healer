@@ -263,6 +263,7 @@ cmd_test() {
   local bad
   for bad in \
     "controlplane.remediation.scaleDownWait=abc" \
+    "controlplane.remediation.verifyWait=125s" \
     "controlplane.remediaton.scaleDownWait=1m" \
     "worker.probing.probeConcurrency=0" \
     "worker.probing.recheckAttempts=0" \

@@ -226,7 +226,7 @@ Kubernetes: `>=1.31.0-0`
 | controlplane.remediation.unstageWait | string | `"30s"` | `UNSTAGE_WAIT`: how long to wait for the CSI driver to unstage the globalmount. |
 | controlplane.remediation.quarantineUnstageWait | string | `"300s"` | `QUARANTINE_UNSTAGE_WAIT`: unstage wait when the mount point holds local data that must be quarantined. |
 | controlplane.remediation.driverRestartWait | string | `"90s"` | `DRIVER_RESTART_WAIT`: how long to wait for the restarted CSI node driver pod to become ready. |
-| controlplane.remediation.verifyWait | string | `"90s"` | `VERIFY_WAIT`: how long to wait for the scaled-up workload to be healthy again. |
+| controlplane.remediation.verifyWait | string | `"3m"` | `VERIFY_WAIT`: how long to wait for the scaled-up workload to be healthy again. Must be longer than `worker.probing.slowRecoveryWindow` + `recheckDelay` + `statTimeout` (the chart refuses to render otherwise): a replacement pod whose mount saw one slow probe stays Suspect that long. |
 | controlplane.remediation.verifyNoPodGrace | string | `"30s"` | `VERIFY_NO_POD_GRACE`: grace period before a workload without pods counts as verified. |
 | controlplane.remediation.episodeMaxDuration | string | `"30m"` | `EPISODE_MAX_DURATION`: an episode running longer is rolled back. |
 | controlplane.remediation.backoffBase | string | `"5m"` | `BACKOFF_BASE`: base of the exponential backoff between episodes for the same mount. |
@@ -250,6 +250,7 @@ Kubernetes: `>=1.31.0-0`
 | worker.probing.recheckDelay | string | `"3s"` | `RECHECK_DELAY`: delay between rechecks of a failing mount. |
 | worker.probing.statTimeout | string | `"5s"` | `STAT_TIMEOUT`: a stat slower than this counts as hung. Must be shorter than `checkInterval`. |
 | worker.probing.slowConfirmWindow | string | `"3m"` | `SLOW_CONFIRM_WINDOW`: slow failures (`stat_timeout`, `probe_hung`) must last this long before a mount is Broken. |
+| worker.probing.slowRecoveryWindow | string | `"2m"` | `SLOW_RECOVERY_WINDOW`: after slow failures a mount stays Suspect until it has probed fine for this long; a failure in between continues the streak, so a mount that keeps flapping becomes Broken after `slowConfirmWindow`. `0s`: the first good probe ends the streak. |
 | worker.probing.podStartupGrace | string | `"60s"` | `POD_STARTUP_GRACE`: mounts of pods younger than this are not judged. |
 | worker.probing.startupGrace | string | `"10s"` | `STARTUP_GRACE`: delay after worker start before the first probe round. |
 | worker.probing.probeConcurrency | int | `4` | `PROBE_CONCURRENCY`: parallel probes per node. |

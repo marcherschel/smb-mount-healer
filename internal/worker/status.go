@@ -205,6 +205,9 @@ func statusApply(st v1alpha1.SmbMountStatus) *ac.SmbMountStatusApplyConfiguratio
 		if d.LastClass != "" {
 			da.WithLastClass(d.LastClass)
 		}
+		if d.RecoveringSince != nil {
+			da.WithRecoveringSince(*d.RecoveringSince)
+		}
 		a.WithDebounce(da)
 	}
 	if g := st.Globalmount; g != nil {

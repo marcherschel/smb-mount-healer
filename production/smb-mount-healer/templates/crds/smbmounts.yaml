@@ -186,6 +186,14 @@ spec:
                         - probe_hung
                         - probe_error
                       type: string
+                    recoveringSince:
+                      description: |-
+                        RecoveringSince is the first successful probe after the last failure of
+                        a slow (stat_timeout, probe_hung) streak. The mount stays Suspect, and
+                        the streak keeps counting, until it has probed fine for
+                        SLOW_RECOVERY_WINDOW.
+                      format: date-time
+                      type: string
                   required:
                     - consecutiveFailures
                   type: object

@@ -43,13 +43,13 @@ func TestS12ControlPlaneKilled(t *testing.T) {
 	f.WaitBaseline()
 	rec := f.RecordSmbMounts()
 	pv := framework.PV("config-a")
-	worker := workerPod(f)
+	wp := workerPod(f)
 	plugin := f.ReadyPod(framework.CSINamespace, framework.CSINodeLabel, f.AgentNode)
 
 	at := injectWrongFSType(f, pv, "deploy-single", "shadow.txt")
 	r := f.WaitNewRemediation()
 	waitStage(f, r.Name, 5*time.Minute, v1alpha1.StageDraining)
-	f.Freeze(worker)
+	f.Freeze(wp)
 	stalled := waitPendingHostTask(f, r.Name, 3*time.Minute)
 	f.Logf("worker frozen; remediation %s waits for host task %s in %s", r.Name, stalled.Name, currentStage(f, r.Name))
 	for _, ht := range f.HostTasksOf(r.Name) {
@@ -58,7 +58,7 @@ func TestS12ControlPlaneKilled(t *testing.T) {
 	}
 
 	f.FreezeContainer(plugin, framework.CSINodeContainer)
-	f.Thaw(worker)
+	f.Thaw(wp)
 	waitHostTask(f, r.Name, string(v1alpha1.StageQuarantining), v1alpha1.HostTaskSucceeded, 3*time.Minute)
 	stage := waitStage(f, r.Name, time.Minute, v1alpha1.StageAwaitingUnstageCompletion, v1alpha1.StageRestartingDriver,
 		v1alpha1.StageScalingUp, v1alpha1.StageVerifying, v1alpha1.StageFinalizing, v1alpha1.StageDone)
@@ -98,12 +98,12 @@ func TestS12aWorkerKilled(t *testing.T) {
 	rec := f.RecordSmbMounts()
 	cp0 := f.Metrics(metrics.ComponentControlPlane)
 	pv := framework.PV("config-a")
-	worker := workerPod(f)
+	wp := workerPod(f)
 
 	at := injectWrongFSType(f, pv, "deploy-single", "")
 	r := f.WaitNewRemediation()
 	waitStage(f, r.Name, 5*time.Minute, v1alpha1.StageDraining)
-	f.Freeze(worker)
+	f.Freeze(wp)
 	waitStage(f, r.Name, 3*time.Minute, v1alpha1.StageReleasingMounts)
 	var pending *v1alpha1.SmbHostTask
 	g.Eventually(func(g gomega.Gomega) {
@@ -114,7 +114,7 @@ func TestS12aWorkerKilled(t *testing.T) {
 		}
 		g.Expect(pending).NotTo(gomega.BeNil(), "a host task waiting for the frozen worker")
 	}).Should(gomega.Succeed())
-	f.Logf("host task %s pending; killing frozen worker %s", pending.Name, worker.Name)
+	f.Logf("host task %s pending; killing frozen worker %s", pending.Name, wp.Name)
 	np := f.KillNow(metrics.ComponentWorker)
 
 	done := f.WaitRemediation(v1alpha1.OutcomeHealed)

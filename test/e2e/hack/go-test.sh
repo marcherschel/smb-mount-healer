@@ -14,6 +14,12 @@
 # -run/-skip select the tests (matched against top-level names with
 # `go test -list`); all other flags are passed to every go test invocation.
 # E2E_TEST_TIMEOUT is the per-test go test -timeout (default 20m).
+# E2E_MAX_BASELINE_FAILURES (default 2, 0 = never): stop the suite once that
+# many tests in a row could not get the cluster back to baseline (the
+# framework prints "=== BASELINE NOT REACHED:"). A cluster that does not
+# settle again fails every later test the same way, 10m each, until the
+# job timeout cancels the run without a summary; the tests left are
+# reported as not run.
 # If E2E_ARTIFACTS and E2E_CLUSTER are set (CI), a failed test is followed by
 # `hack/ci-e2e.sh collect` into $E2E_ARTIFACTS/tests/<Test>: kernel log, cifs
 # state and healer logs as of that failure, not as of the end of the suite
@@ -26,6 +32,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../../.."   # repository root
 PKGS=./test/e2e/...
 TIMEOUT=${E2E_TEST_TIMEOUT:-20m}
+MAX_BASELINE_FAILURES=${E2E_MAX_BASELINE_FAILURES:-2}
+# Must match framework.BaselineNotReachedMarker.
+BASELINE_MARKER='=== BASELINE NOT REACHED:'
 
 run_re=. skip_re=
 pass=()
@@ -55,8 +64,13 @@ if [ "${total}" -eq 0 ]; then
     exit 1
 fi
 
-done_n=0 passed=0 failed=0 skipped=0 failed_names=()
+done_n=0 passed=0 failed=0 skipped=0 failed_names=() not_run=()
+baseline_streak=0 stopped=
 while IFS= read -r t; do
+    if [ -n "${stopped}" ]; then
+        not_run+=("${t}")
+        continue
+    fi
     # A subtest part of -run (TestA/sub) is kept for its test.
     sub=
     case ${run_re} in */*) sub=/${run_re#*/} ;; esac
@@ -64,18 +78,25 @@ while IFS= read -r t; do
     go test -tags e2e "${PKGS}" -p 1 -count=1 -timeout "${TIMEOUT}" -v \
         ${pass[@]+"${pass[@]}"} -run "^${t}\$${sub}" \
         ${skip_re:+-skip "${skip_re}"} 2>&1 | {
-        result=none
+        result=none baseline=
         while IFS= read -r line; do
             printf '%s\n' "${line}"
             case ${line} in
                 "--- PASS: ${t} "*) result=pass ;;
                 "--- FAIL: ${t} "*) result=fail ;;
                 "--- SKIP: ${t} "*) result=skip ;;
+                "${BASELINE_MARKER}"*) baseline=1 ;;
             esac
         done
         # A panic or timeout kills the binary before it prints --- FAIL.
-        case ${result} in pass) exit 0 ;; skip) exit 3 ;; *) exit 1 ;; esac
+        # 4: failed, and the baseline was not reached.
+        case ${result} in pass) exit 0 ;; skip) exit 3 ;; *) exit $((baseline ? 4 : 1)) ;; esac
     } || rc=$?
+    if [ "${rc}" -eq 4 ]; then
+        baseline_streak=$((baseline_streak + 1))
+    else
+        baseline_streak=0
+    fi
     case ${rc} in
         0) passed=$((passed + 1)) ;;
         3) skipped=$((skipped + 1)) ;;
@@ -89,9 +110,16 @@ while IFS= read -r t; do
     printf '=== PROGRESS %d/%d (%d%%): %d passed, %d failed, %d skipped, elapsed %dm%02ds\n' \
         "${done_n}" "${total}" $((done_n * 100 / total)) "${passed}" "${failed}" "${skipped}" \
         $((SECONDS / 60)) $((SECONDS % 60))
+    if [ "${MAX_BASELINE_FAILURES}" -gt 0 ] && [ "${baseline_streak}" -ge "${MAX_BASELINE_FAILURES}" ]; then
+        stopped=1
+        echo "=== STOPPING: ${baseline_streak} tests in a row could not get the cluster back to baseline (E2E_MAX_BASELINE_FAILURES=${MAX_BASELINE_FAILURES})"
+    fi
 done <<<"${tests}"
 
-if [ "${failed}" -gt 0 ]; then
+if [ "${#not_run[@]}" -gt 0 ]; then
+    echo "=== NOT RUN (${#not_run[@]}/${total}): ${not_run[*]}"
+fi
+if [ "${failed}" -gt 0 ] || [ "${#not_run[@]}" -gt 0 ]; then
     echo "=== FAILED (${failed}/${total}): ${failed_names[*]}"
     exit 1
 fi
