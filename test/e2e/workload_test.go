@@ -49,8 +49,21 @@ func runWrongFSType(t *testing.T, workload, pv string, scopePVs []string) {
 	g.Expect(cp.Get(metrics.WorkloadActionsTotal, append([]string{metrics.LabelAction, "scale_up"}, live...)...)).To(gomega.Equal(1.0), "scale_up")
 	g.Expect(cp.Get(metrics.WorkloadActionsTotal, append([]string{metrics.LabelAction, "driver_restart"}, live...)...)).To(gomega.Equal(1.0), "driver_restart")
 	g.Expect(cp.Get(metrics.WorkloadVerificationsTotal, metrics.LabelResult, string(v1alpha1.VerificationVerified))).To(gomega.Equal(1.0))
-	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, "quarantine", metrics.LabelDryRun, "false")).To(gomega.BeNumerically(">=", 1),
+	// No shadow data is injected, so the globalmount dir is empty. Whether a
+	// quarantine task runs at all is timing: if kubelet unstaged and removed
+	// the empty dirs before the remediation reached quarantining (seconds
+	// after the drain), the status lists no dir and the stage is
+	// nothing_to_do without a task. Either way nothing may fail and no data
+	// may be moved; S6 and S12 cover a quarantine that moves data.
+	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, "quarantine", metrics.LabelResult, "failed")).To(gomega.BeZero(),
 		"host_actions{quarantine}:\n%s", w.After.Series(metrics.HostActionsTotal))
+	for _, res := range hostResults(f, r.Name)[v1alpha1.HostActionQuarantine] {
+		g.Expect(res.Result).NotTo(gomega.Equal(v1alpha1.HostActionFailed), "quarantine %s: %s", res.ID, res.Error)
+		g.Expect(res.Entries).To(gomega.BeZero(), "quarantine %s moved data although none was injected", res.ID)
+	}
+	for _, q := range f.Quarantines() {
+		g.Expect(q.Spec.RemediationRef).NotTo(gomega.Equal(r.Name), "SmbQuarantine %s from %s although no shadow data was injected", q.Name, r.Name)
+	}
 	g.Expect(w.Get(metrics.MountChecksTotal, metrics.LabelResult, string(v1alpha1.ReasonWrongFSType))).To(gomega.BeNumerically(">=", 1))
 
 	// Exactly one episode.
