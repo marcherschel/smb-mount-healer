@@ -46,6 +46,8 @@ Per outcome:
 - **`failed`**: a `smbt` has a `Failed` result; its message says which action (force unmount, quarantine) failed. Then check the worker log on the node: `kubectl -n smb-mount-healer-system logs <worker-pod> --since=1h`.
 - **`skipped_no_owner`**: list the pods on the node that use the PV (`.status.podMounts` of the `smbm`) and find the ones without a Deployment/StatefulSet owner.
 
+See also [failure-modes.md](../failure-modes.md): [expired credentials](../failure-modes.md#expired-or-rotated-credentials), [server still down during the episode](../failure-modes.md#partial-outage-server-still-down-during-the-episode) and [pinned volumes](../failure-modes.md#a-pod-the-healer-cant-scale-pins-the-volume).
+
 ## Mitigation
 
 - **Mount still broken, workload affected**: scale every workload using the PV on that node to 0, wait until its globalmount directory under `/var/lib/kubelet/plugins/kubernetes.io/csi/smb.csi.k8s.io/<hash>/` is gone, restart the `csi-smb-node` pod on the node, then scale back up. Or cordon and drain the node so the pods land elsewhere.

@@ -81,6 +81,25 @@ All state lives in custom resources, so you can follow every step with
   StatefulSet, because the healer drains them by scaling. It never touches
   bare pods; it only reports them (outcome `skipped_no_owner`).
 
+## When not to use this
+
+The healer drains a node by scaling the **whole** owning Deployment or
+StatefulSet to 0, not just its pods on the broken node, and there is no
+per-workload opt-out. Think twice if your SMB volumes are used by:
+
+- **RWX workloads spread across many nodes**: one node's broken mount takes
+  every replica, on every node, down for the episode.
+- **Workloads that can't be scaled to 0**, or whose replicas another
+  controller keeps re-asserting every few seconds.
+- **StatefulSets with strict quorum** (etcd, ZooKeeper, Kafka, …): the whole
+  ensemble goes down, not one member.
+- **Jobs, DaemonSets or bare pods**: the healer can't scale them, so they keep
+  the broken volume pinned.
+
+It also can't fix what a remount doesn't fix, such as expired credentials or
+a server that stays down. Details, and what the healer does for each kind of
+SMB failure, are in [docs/failure-modes.md](docs/failure-modes.md).
+
 ## Quick start
 
 Using Flux? Follow the
@@ -204,6 +223,7 @@ kubectl delete crd smbmounts.smbhealer.herschel.io smbmountremediations.smbheale
 ## Documentation
 
 - [Architecture](docs/architecture.md): run modes, custom resources, package layout, metrics
+- [Failure modes and limits](docs/failure-modes.md): what happens on a reboot, IP change, expired credentials or partial outage, and when not to use the healer
 - [Remediation state machine](docs/state-machine.md)
 - [Configuration](docs/configuration.md): flags and environment variables of the binary
 - [Runbooks](docs/runbooks)
