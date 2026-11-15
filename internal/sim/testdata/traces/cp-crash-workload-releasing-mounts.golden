@@ -32,7 +32,7 @@
 {"t":"00:08:23","kind":"kubelet","obj":"n1","msg":"unstage config-a failed: unmount gm(config-a): host is down (attempt 1, retry in 500ms)"}
 {"t":"00:08:23","kind":"smbm","obj":"n1.config-a","msg":"Broken(probe_hung) gm=cifs stage=awaiting_unstage"}
 {"t":"00:08:24","kind":"kubelet","obj":"n1","msg":"unstage config-a failed: unmount gm(config-a): host is down (attempt 2, retry in 1s)"}
-{"t":"00:08:42","kind":"cmd","obj":"SmbHostTask/n1-1791677169-awaiting-unstage-0","msg":"create [ForceUnmount:gm(config-a)?NotHealthyMount]"}
+{"t":"00:08:42","kind":"cmd","obj":"SmbHostTask/n1-1791677169-awaiting-unstage-0","msg":"create [ForceUnmount:gm(config-a)]"}
 {"t":"00:08:43","kind":"stage","obj":"n1-1791677169","from":"awaiting_unstage","to":"quarantining","reason":"force_unmounted"}
 {"t":"00:08:43","kind":"cmd","obj":"SmbHostTask/n1-1791677169-quarantining-0","msg":"create [Quarantine:gm(config-a)?NotMountpoint]"}
 {"t":"00:08:43","kind":"smbt","obj":"n1-1791677169-awaiting-unstage-0","to":"Succeeded","msg":"[unmount-000=Succeeded]"}

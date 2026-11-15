@@ -64,9 +64,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Tool and dependency versions in versions.env",
+      "description": "Test-environment versions in versions.env and support tool versions in tools.env",
       "managerFilePatterns": [
-        "/^versions\\.env$/"
+        "/^versions\\.env$/",
+        "/^tools\\.env$/"
       ],
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)(?:\\s+registryUrl=(?<registryUrl>[^\\s]+))?(?:\\s+versioning=(?<versioning>[^\\s]+))?\\n[A-Z0-9_]+=(?<currentValue>[^\\s]+)"

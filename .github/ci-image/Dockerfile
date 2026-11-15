@@ -1,5 +1,5 @@
 # CI toolbox for .github/workflows/ci.yaml and release.yaml (job container).
-# Tool versions come from versions.env (passed as build args by build.sh and
+# Tool versions come from versions.env and tools.env (passed as build args by build.sh and
 # .github/workflows/ci-image.yaml).
 #
 # Downloads run once on the build platform (no emulation); only the final
