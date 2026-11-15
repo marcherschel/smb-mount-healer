@@ -333,9 +333,17 @@ func senior(a, b *v1alpha1.SmbMountRemediation) bool {
 }
 
 // deadGlobalmounts returns the mounted, non-healthy (brokenOnly: Broken)
-// globalmounts of pvs.
+// globalmounts of pvs. Without brokenOnly, the globalmount of a co-tenant PV
+// (one this remediation has seen not healthy, see cotenantPVs) counts as
+// dead even if it reports Healthy now: a share that keeps flapping can
+// probe fine for a moment, and keeping its old mount means the remediation
+// remounts nothing (e2e S3 netem, run 43725390878).
 func (m *machine) deadGlobalmounts(pvs []string, brokenOnly bool) []v1alpha1.DeadGlobalmount {
 	var out []v1alpha1.DeadGlobalmount
+	var seenUnhealthy []string
+	if !brokenOnly {
+		seenUnhealthy = m.cotenantPVs()
+	}
 	for _, pv := range pvs {
 		sm := m.idx.mountByPV[pv]
 		if sm == nil || sm.Status.Globalmount == nil || !sm.Status.Globalmount.Mounted {
@@ -344,7 +352,7 @@ func (m *machine) deadGlobalmounts(pvs []string, brokenOnly bool) []v1alpha1.Dea
 		if brokenOnly && sm.Status.Health != v1alpha1.HealthBroken {
 			continue
 		}
-		if !brokenOnly && sm.Status.Health == v1alpha1.HealthHealthy {
+		if !brokenOnly && sm.Status.Health == v1alpha1.HealthHealthy && !containsString(seenUnhealthy, pv) {
 			continue
 		}
 		out = append(out, v1alpha1.DeadGlobalmount{PVName: pv, Path: sm.Spec.GlobalmountPath})
@@ -727,7 +735,7 @@ func (m *machine) stepAwaitingUnstage() {
 	ts := m.ensureTask(v1alpha1.StageAwaitingUnstage, 0, func() []v1alpha1.HostAction {
 		var l actionList
 		for _, d := range mounted {
-			l.add(v1alpha1.HostActionForceUnmount, d.Path, d.PVName, v1alpha1.OnlyIfNotHealthyMount)
+			l.add(v1alpha1.HostActionForceUnmount, d.Path, d.PVName, m.deadGlobalmountGuard(d.PVName))
 		}
 		return l.acts
 	})
@@ -740,6 +748,26 @@ func (m *machine) stepAwaitingUnstage() {
 		m.move(v1alpha1.StageQuarantining, ReasonForceUnmounted)
 	case taskWaiting:
 	}
+}
+
+// deadGlobalmountGuard is the onlyIf of the force-unmount of a dead
+// globalmount. The globalmount was judged dead from the debounced health,
+// and one fresh probe of a flapping share must not overrule that (the
+// remediation would restart the driver and scale up onto the same mount).
+// So there is no probe precondition once no pod outside the drain set uses
+// the PV: unmounting is then harmless (existing bind mounts keep their
+// superblock; kubelet unstages the dir and stages a fresh mount on next
+// use). A pod the remediation does not drain (e.g. an unowned co-tenant)
+// still needs the mount, so the worker's NotHealthyMount check stays.
+func (m *machine) deadGlobalmountGuard(pv string) v1alpha1.OnlyIf {
+	drain := m.drainUIDs()
+	for i := range m.idx.pods {
+		p := &m.idx.pods[i]
+		if !drain[p.UID] && !p.Terminating && containsString(p.PVs, pv) {
+			return v1alpha1.OnlyIfNotHealthyMount
+		}
+	}
+	return ""
 }
 
 func (m *machine) stepQuarantining() {

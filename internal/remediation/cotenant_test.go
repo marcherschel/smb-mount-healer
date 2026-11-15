@@ -85,3 +85,71 @@ func scoped(obj *v1alpha1.SmbMountRemediation, workload string) bool {
 	}
 	return false
 }
+
+// TestFlappingGlobalmountIsForceUnmounted: e2e S3 netem (run 43725390878).
+// The globalmount of pv-a was Broken when the remediation planned, then
+// probes Healthy for a moment. It still counts as dead, and its
+// force-unmount carries no probe precondition (every pod using pv-a is
+// drained), so one good probe cannot keep the old mount: before, the
+// remediation restarted the driver and scaled up onto the same mount.
+func TestFlappingGlobalmountIsForceUnmounted(t *testing.T) {
+	cfg := testCfg()
+	w := newWorld()
+	w.stuck = true // kubelet does not unstage on its own
+	obj := workloadRem()
+
+	w.runUntil(t, obj, cfg, v1alpha1.StagePlanning)
+	w.mounts["pv-a"].Status.Health = v1alpha1.HealthHealthy
+	w.runUntil(t, obj, cfg, v1alpha1.StageQuarantining)
+
+	if len(obj.Status.DeadGlobalmounts) != 1 || obj.Status.DeadGlobalmounts[0].PVName != "pv-a" {
+		t.Fatalf("deadGlobalmounts = %+v, want pv-a (seen not healthy by this remediation)", obj.Status.DeadGlobalmounts)
+	}
+	a := forceUnmountOf(t, w, obj, gmPath("pv-a"))
+	if a.OnlyIf != "" {
+		t.Fatalf("force-unmount of pv-a's globalmount has onlyIf %q, want none (all its pods are drained)", a.OnlyIf)
+	}
+	if w.mounts["pv-a"].Status.Globalmount.Mounted {
+		t.Fatalf("pv-a's globalmount still mounted after the force-unmount")
+	}
+}
+
+// TestDeadGlobalmountKeepsGuardForUndrainedPod: a pod the remediation does
+// not drain (unowned) still uses pv-a, so it still needs the mount; the
+// worker's NotHealthyMount check stays and a healthy probe skips it.
+func TestDeadGlobalmountKeepsGuardForUndrainedPod(t *testing.T) {
+	cfg := testCfg()
+	w := newWorld()
+	w.stuck = true
+	w.addPod("", "bare", "u-bare", map[string]v1alpha1.Health{"pv-a": v1alpha1.HealthHealthy})
+	obj := workloadRem()
+
+	w.runUntil(t, obj, cfg, v1alpha1.StagePlanning)
+	w.mounts["pv-a"].Status.Health = v1alpha1.HealthHealthy
+	w.runUntil(t, obj, cfg, v1alpha1.StageQuarantining)
+
+	a := forceUnmountOf(t, w, obj, gmPath("pv-a"))
+	if a.OnlyIf != v1alpha1.OnlyIfNotHealthyMount {
+		t.Fatalf("force-unmount of pv-a's globalmount has onlyIf %q, want %s (pod bare still uses it)", a.OnlyIf, v1alpha1.OnlyIfNotHealthyMount)
+	}
+	if !w.mounts["pv-a"].Status.Globalmount.Mounted {
+		t.Fatalf("pv-a's globalmount was unmounted although it probes healthy and pod bare uses it")
+	}
+}
+
+// forceUnmountOf returns the ForceUnmount action of the awaiting_unstage
+// host task for path.
+func forceUnmountOf(t *testing.T, w *world, obj *v1alpha1.SmbMountRemediation, path string) v1alpha1.HostAction {
+	t.Helper()
+	task := w.tasks[v1alpha1.HostTaskName(obj.Name, v1alpha1.StageAwaitingUnstage, 0)]
+	if task == nil {
+		t.Fatalf("no awaiting_unstage host task; trace %s", trace(obj))
+	}
+	for _, a := range task.Spec.Actions {
+		if a.Type == v1alpha1.HostActionForceUnmount && a.Path == path {
+			return a
+		}
+	}
+	t.Fatalf("awaiting_unstage task has no ForceUnmount of %s: %+v", path, task.Spec.Actions)
+	return v1alpha1.HostAction{}
+}

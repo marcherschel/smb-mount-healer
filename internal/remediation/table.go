@@ -109,7 +109,7 @@ var rules = []Rule{
 	{Machine: v1alpha1.RemediationTypeWorkload, From: []v1alpha1.Stage{v1alpha1.StageAwaitingUnstage}, To: v1alpha1.StageQuarantining,
 		Reasons: []string{ReasonNothingToDo, ReasonUnstaged, ReasonForceUnmounted, ReasonDryRun},
 		Guard:   "no dead globalmount, or all dead globalmounts unmounted, or after `UNSTAGE_WAIT` the force-unmount host task finished, or dry run (task exists)",
-		Actions: "on entry: record `deadGlobalmounts`; after `UNSTAGE_WAIT`: `CreateHostTask(ForceUnmount dead globalmounts)`; " + holdZero},
+		Actions: "on entry: record `deadGlobalmounts` (mounted globalmounts that are not healthy, or of a PV in `scope.cotenantPVs`); after `UNSTAGE_WAIT`: `CreateHostTask(ForceUnmount dead globalmounts)`, onlyIf=NotHealthyMount only while a pod outside the drain set uses the PV, else no precondition; " + holdZero},
 	{Machine: v1alpha1.RemediationTypeWorkload, From: []v1alpha1.Stage{v1alpha1.StageQuarantining}, To: v1alpha1.StageAwaitingUnstageCompletion,
 		Reasons: []string{ReasonHostTaskCompleted, ReasonNothingToDo, ReasonDryRun},
 		Guard:   "host task Succeeded/Failed, nothing to quarantine, or dry run (task exists)",

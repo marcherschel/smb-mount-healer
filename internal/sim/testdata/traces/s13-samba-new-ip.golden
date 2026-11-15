@@ -24,7 +24,7 @@
 {"t":"00:03:21","kind":"scope","obj":"n1-1791676995","msg":"workloads=[Deployment/apps/deploy-single(orig=1,scaled_down)] pvs=[config-a] drain=[deploy-single-5d8f7c9b6-001] deadGlobalmounts=config-a"}
 {"t":"00:03:21","kind":"smbm","obj":"n1.config-a","msg":"Broken(stat_error) gm=cifs stage=awaiting_unstage"}
 {"t":"00:03:22","kind":"kubelet","obj":"n1","msg":"unstage config-a failed: unmount gm(config-a): host is down (attempt 2, retry in 1s)"}
-{"t":"00:03:51","kind":"cmd","obj":"SmbHostTask/n1-1791676995-awaiting-unstage-0","msg":"create [ForceUnmount:gm(config-a)?NotHealthyMount]"}
+{"t":"00:03:51","kind":"cmd","obj":"SmbHostTask/n1-1791676995-awaiting-unstage-0","msg":"create [ForceUnmount:gm(config-a)]"}
 {"t":"00:03:52","kind":"stage","obj":"n1-1791676995","from":"awaiting_unstage","to":"quarantining","reason":"force_unmounted"}
 {"t":"00:03:52","kind":"cmd","obj":"SmbHostTask/n1-1791676995-quarantining-0","msg":"create [Quarantine:gm(config-a)?NotMountpoint]"}
 {"t":"00:03:52","kind":"smbt","obj":"n1-1791676995-awaiting-unstage-0","to":"Succeeded","msg":"[unmount-000=Succeeded]"}
