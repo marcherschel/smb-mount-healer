@@ -4,6 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/marcherschel/smb-mount-healer?label=release)](https://github.com/marcherschel/smb-mount-healer/releases/latest)
 [![License](https://img.shields.io/github/license/marcherschel/smb-mount-healer)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/marcherschel/smb-mount-healer)](go.mod)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/marcherschel/smb-mount-healer/badge)](https://scorecard.dev/viewer/?uri=github.com/marcherschel/smb-mount-healer)
 
 A Kubernetes operator that detects broken SMB/CIFS volumes of
 [csi-driver-smb](https://github.com/kubernetes-csi/csi-driver-smb) and heals
