@@ -2,6 +2,8 @@
 
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/smb-mount-healer)](https://artifacthub.io/packages/search?repo=smb-mount-healer)
 [![Release](https://img.shields.io/github/v/release/marcherschel/smb-mount-healer?label=release)](https://github.com/marcherschel/smb-mount-healer/releases/latest)
+[![CI](https://github.com/marcherschel/smb-mount-healer/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/marcherschel/smb-mount-healer/actions/workflows/ci.yaml)
+[![CodeQL](https://github.com/marcherschel/smb-mount-healer/actions/workflows/codeql.yaml/badge.svg?branch=main)](https://github.com/marcherschel/smb-mount-healer/actions/workflows/codeql.yaml)
 [![License](https://img.shields.io/github/license/marcherschel/smb-mount-healer)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/marcherschel/smb-mount-healer)](go.mod)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/marcherschel/smb-mount-healer/badge)](https://scorecard.dev/viewer/?uri=github.com/marcherschel/smb-mount-healer)
