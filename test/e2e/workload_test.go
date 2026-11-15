@@ -9,6 +9,7 @@ import (
 
 	"github.com/marcherschel/smb-mount-healer/api/v1alpha1"
 	"github.com/marcherschel/smb-mount-healer/internal/metrics"
+	"github.com/marcherschel/smb-mount-healer/internal/worker"
 	"github.com/marcherschel/smb-mount-healer/test/e2e/framework"
 )
 
@@ -55,7 +56,7 @@ func runWrongFSType(t *testing.T, workload, pv string, scopePVs []string) {
 	// after the drain), the status lists no dir and the stage is
 	// nothing_to_do without a task. Either way nothing may fail and no data
 	// may be moved; S6 and S12 cover a quarantine that moves data.
-	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, "quarantine", metrics.LabelResult, "failed")).To(gomega.BeZero(),
+	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, worker.ActionLabelQuarantine, metrics.LabelResult, worker.ResultLabelFailed)).To(gomega.BeZero(),
 		"host_actions{quarantine}:\n%s", w.After.Series(metrics.HostActionsTotal))
 	for _, res := range hostResults(f, r.Name)[v1alpha1.HostActionQuarantine] {
 		g.Expect(res.Result).NotTo(gomega.Equal(v1alpha1.HostActionFailed), "quarantine %s: %s", res.ID, res.Error)
