@@ -14,6 +14,10 @@
 # -run/-skip select the tests (matched against top-level names with
 # `go test -list`); all other flags are passed to every go test invocation.
 # E2E_TEST_TIMEOUT is the per-test go test -timeout (default 20m).
+# If E2E_ARTIFACTS and E2E_CLUSTER are set (CI), a failed test is followed by
+# `hack/ci-e2e.sh collect` into $E2E_ARTIFACTS/tests/<Test>: kernel log, cifs
+# state and healer logs as of that failure, not as of the end of the suite
+# (a worker replaced by a later test takes its log with it).
 # Used by `make e2e-run` and the Tiltfile's e2e-tests resource; both tee the
 # output to $E2E_LOG_DIR/<cluster>.go-test.log.
 # Exits non-zero if any test failed (or if none was selected).
@@ -75,7 +79,11 @@ while IFS= read -r t; do
     case ${rc} in
         0) passed=$((passed + 1)) ;;
         3) skipped=$((skipped + 1)) ;;
-        *) failed=$((failed + 1)); failed_names+=("${t}") ;;
+        *) failed=$((failed + 1)); failed_names+=("${t}")
+           if [ -n "${E2E_ARTIFACTS:-}" ] && [ -n "${E2E_CLUSTER:-}" ]; then
+               hack/ci-e2e.sh collect "${E2E_CLUSTER}" "${E2E_ARTIFACTS}/tests/${t}" 2>&1 \
+                   | sed 's/^/=== COLLECT: /' || true
+           fi ;;
     esac
     done_n=$((done_n + 1))
     printf '=== PROGRESS %d/%d (%d%%): %d passed, %d failed, %d skipped, elapsed %dm%02ds\n' \
