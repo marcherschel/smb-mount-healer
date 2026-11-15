@@ -59,7 +59,7 @@ existing tags (`hack/next-version.sh`):
 | Tag | `vX.Y.Z` | `chart-vA.B.C` |
 | Workflow | `.github/workflows/release-app.yaml` | `.github/workflows/release-chart.yaml` |
 | Tag points at | the `main` commit, created once the CI suite passed on it | a release commit on top of `main` with the stamped `Chart.yaml` (reachable only from the tag) |
-| Publishes | `ghcr.io/marcherschel/smb-mount-healer:X.Y.Z`; GitHub release with static binaries, SBOMs (binaries: SPDX + CycloneDX; image: SPDX), CRDs, `SHA256SUMS` (`make dist-app`) | `oci://ghcr.io/marcherschel/charts/smb-mount-healer` A.B.C; GitHub release with chart package, dashboard, rules, PrometheusRule, `SHA256SUMS` (`make dist-chart`) |
+| Publishes | `ghcr.io/marcherschel/smb-mount-healer:X.Y.Z`; GitHub release with static binaries, SBOMs (binaries: SPDX + CycloneDX; image: SPDX), CRDs, `SHA256SUMS` (`make dist-app`), signed `SHA256SUMS.sigstore.json`, provenance `smb-mount-healer.intoto.jsonl` | `oci://ghcr.io/marcherschel/charts/smb-mount-healer` A.B.C; GitHub release with chart package, dashboard, rules, PrometheusRule, `SHA256SUMS` (`make dist-chart`), signed `SHA256SUMS.sigstore.json`, provenance `smb-mount-healer-A.B.C.tgz.intoto.jsonl` |
 
 The app release runs the full CI suite first (unless skipped, see below);
 the chart release runs only the chart checks. Only versions with a

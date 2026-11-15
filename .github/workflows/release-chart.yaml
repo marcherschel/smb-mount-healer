@@ -16,12 +16,17 @@ name: release-chart
 #   ghcr.io/<owner>/charts/smb-mount-healer:artifacthub.io  ArtifactHub repository
 #                                    metadata (production/smb-mount-healer/artifacthub-repo.yml)
 #   GitHub release chart-vA.B.C with dist/chart (make dist-chart): chart
-#   package, Grafana dashboard, Prometheus rule file, PrometheusRule, SHA256SUMS.
+#   package, Grafana dashboard, Prometheus rule file, PrometheusRule, SHA256SUMS;
+#   plus SHA256SUMS.sigstore.json (cosign bundle) and the chart package's
+#   provenance bundle smb-mount-healer-A.B.C.tgz.intoto.jsonl.
+# The chart in GHCR carries a keyless cosign signature; how to verify it and
+# the release files: SECURITY.md#verifying-a-release.
 # Chart checks gate every publish step: chart lint and tests (helm,
 # kubeconform, promtool) and the dashboard/alert metric names. The Go suite
 # (unit, envtest, e2e) never runs here; it gates the app release.
 # With input `tag`, an existing chart tag is released again (for example after
-# a failed run); `bump` is ignored then.
+# a failed run); `bump` is ignored then. Run it on main or on that chart-v* tag:
+# the signatures name that ref, and SECURITY.md accepts only those.
 
 on:
   workflow_dispatch:
@@ -89,6 +94,13 @@ jobs:
           if [ -n "$INPUT_TAG" ]; then
             if [[ ! "$INPUT_TAG" =~ ^chart-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
               echo "::error::tag ${INPUT_TAG} is not chart-vA.B.C[-pre]"
+              exit 1
+            fi
+            # The cosign signature names the ref the workflow ran on; SECURITY.md
+            # documents main or a chart-v* tag. Refuse anything else before a
+            # chart is published with a signature nobody can verify.
+            if [ "$GITHUB_REF" != refs/heads/main ] && [[ "$GITHUB_REF" != refs/tags/chart-v* ]]; then
+              echo "::error::release ${INPUT_TAG} again from main or a chart-v* tag, not ${GITHUB_REF}"
               exit 1
             fi
             echo "release existing tag ${INPUT_TAG}"
@@ -165,6 +177,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write # provenance attestation
+      attestations: write
     container:
       image: ghcr.io/marcherschel/smb-mount-healer-ci:f240ac92682eea72cf37e1996724dd559d02797b@sha256:586218b4b8b19f8c211f1154e9753d149c6238d9c656d096e903255a19e1bdcc
     outputs:
@@ -213,6 +227,21 @@ jobs:
       - name: Build release assets (make dist-chart)
         run: make dist-chart CHART_VERSION="$TAG"
 
+      # Provenance of the chart package on the GitHub release:
+      # gh attestation verify smb-mount-healer-A.B.C.tgz --repo <owner>/smb-mount-healer
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        id: provenance
+        with:
+          subject-path: dist/chart/smb-mount-healer-${{ steps.check.outputs.version }}.tgz
+
+      # The attestation bundle as a release asset too (OpenSSF Scorecard
+      # Signed-Releases looks for *.intoto.jsonl); not listed in SHA256SUMS.
+      - name: Provenance bundle as release asset
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          VERSION: ${{ steps.check.outputs.version }}
+        run: cp "$BUNDLE" "dist/chart/smb-mount-healer-${VERSION}.tgz.intoto.jsonl"
+
       - name: Push chart
         id: push
         env:
@@ -242,9 +271,10 @@ jobs:
           if-no-files-found: error
 
   # cosign-installer needs envsubst, which the CI image lacks: sign on the
-  # plain runner. Keyless signature (GitHub OIDC -> Sigstore) attached to the
-  # chart in GHCR; ArtifactHub shows OCI charts with a cosign signature as
-  # signed.
+  # plain runner. Keyless signatures (GitHub OIDC -> Sigstore): one attached to
+  # the chart in GHCR (ArtifactHub shows OCI charts with a cosign signature as
+  # signed), one Sigstore bundle of SHA256SUMS for the GitHub release. Both
+  # are verified with the identity SECURITY.md documents.
   sign:
     name: Sign chart
     needs: publish
@@ -253,8 +283,17 @@ jobs:
       contents: read
       packages: write
       id-token: write # keyless cosign signature
+    env:
+      # Keep in sync with SECURITY.md#verifying-a-release.
+      IDENTITY_REGEXP: ^https://github\.com/${{ github.repository }}/\.github/workflows/release-chart\.yaml@refs/(heads/main|tags/chart-v)
+      OIDC_ISSUER: https://token.actions.githubusercontent.com
     steps:
       - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-chart
+          path: dist/chart
 
       - name: Sign the chart (cosign, keyless)
         env:
@@ -263,6 +302,23 @@ jobs:
         run: |
           printf '%s' "$GHCR_TOKEN" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
           cosign sign --yes "$REF"
+          cosign verify "$REF" --certificate-identity-regexp "$IDENTITY_REGEXP" --certificate-oidc-issuer "$OIDC_ISSUER" >/dev/null
+          echo "verified ${REF}"
+
+      # OpenSSF Scorecard Signed-Releases looks for *.sigstore.json assets.
+      - name: Sign SHA256SUMS (cosign, keyless)
+        run: |
+          mkdir -p "${RUNNER_TEMP}/sigs"
+          bundle="${RUNNER_TEMP}/sigs/SHA256SUMS.sigstore.json"
+          cosign sign-blob --yes --bundle "$bundle" dist/chart/SHA256SUMS
+          cosign verify-blob --bundle "$bundle" --certificate-identity-regexp "$IDENTITY_REGEXP" \
+            --certificate-oidc-issuer "$OIDC_ISSUER" dist/chart/SHA256SUMS
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-chart-sigs
+          path: ${{ runner.temp }}/sigs/
+          if-no-files-found: error
 
   github-release:
     name: GitHub release
@@ -281,6 +337,11 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist-chart
+          path: dist/chart
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-chart-sigs
           path: dist/chart
 
       - name: Create release

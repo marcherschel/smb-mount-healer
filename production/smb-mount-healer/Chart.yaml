@@ -57,6 +57,8 @@ annotations:
       url: https://raw.githubusercontent.com/marcherschel/smb-mount-healer/main/docs/demo/grafana-dashboard.png
   artifacthub.io/changes: |
     - kind: added
+      description: Chart signature verification documented (cosign verify, Flux chart.spec.verify in the quick start); releases ship a signed SHA256SUMS (Sigstore bundle) and the chart package's provenance.
+    - kind: added
       description: App releases ship SBOMs (image per platform, binaries in SPDX and CycloneDX); linked from ArtifactHub.
     - kind: changed
       description: Licensed under Apache-2.0 (was GPL-2.0-only).
