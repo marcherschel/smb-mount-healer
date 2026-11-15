@@ -119,3 +119,36 @@ Fail when a PrometheusRule is requested but the Prometheus Operator CRD is missi
 {{- fail "monitoring.prometheusRule.enabled=true needs the monitoring.coreos.com/v1 PrometheusRule CRD (Prometheus Operator); install it or set monitoring.prometheusRule.enabled=false" }}
 {{- end }}
 {{- end }}
+
+{{/*
+A Go duration string (values.schema.json "duration", e.g. 90s, 1m30s, 1.5h)
+in seconds, as a float.
+*/}}
+{{- define "smb-mount-healer.durationSeconds" -}}
+{{- $total := 0.0 }}
+{{- range regexFindAll "[0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h)" (toString .) -1 }}
+{{- $n := float64 (regexFind "^[0-9]+(\\.[0-9]+)?" .) }}
+{{- $unit := regexReplaceAll "^[0-9]+(\\.[0-9]+)?" . "" }}
+{{- $f := get (dict "h" 3600.0 "m" 60.0 "s" 1.0 "ms" 0.001 "us" 0.000001 "µs" 0.000001 "ns" 0.000000001) $unit }}
+{{- $total = addf $total (mulf $n $f) }}
+{{- end }}
+{{- $total }}
+{{- end }}
+
+{{/*
+Fail unless controlplane.remediation.verifyWait is longer than
+worker.probing.slowRecoveryWindow + recheckDelay + statTimeout. A replacement
+pod whose mount saw one slow probe stays Suspect for slowRecoveryWindow (it
+is re-probed every recheckDelay, a probe takes up to statTimeout); a shorter
+verifyWait can never verify it and ends such a remediation verify_failed.
+*/}}
+{{- define "smb-mount-healer.validateVerifyWait" -}}
+{{- $p := .Values.worker.probing }}
+{{- $verify := include "smb-mount-healer.durationSeconds" .Values.controlplane.remediation.verifyWait | float64 }}
+{{- $window := include "smb-mount-healer.durationSeconds" $p.slowRecoveryWindow | float64 }}
+{{- $recheck := include "smb-mount-healer.durationSeconds" $p.recheckDelay | float64 }}
+{{- $stat := include "smb-mount-healer.durationSeconds" $p.statTimeout | float64 }}
+{{- if and (gt $window 0.0) (le $verify (addf $window $recheck $stat)) }}
+{{- fail (printf "controlplane.remediation.verifyWait (%s) must be longer than worker.probing.slowRecoveryWindow (%s) + recheckDelay (%s) + statTimeout (%s): a replacement pod with one slow probe stays Suspect that long and could never be verified" (toString .Values.controlplane.remediation.verifyWait) (toString $p.slowRecoveryWindow) (toString $p.recheckDelay) (toString $p.statTimeout)) }}
+{{- end }}
+{{- end }}

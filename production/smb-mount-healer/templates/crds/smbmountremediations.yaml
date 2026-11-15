@@ -277,6 +277,18 @@ spec:
                 scope:
                   description: RemediationScope is everything an episode may touch.
                   properties:
+                    cotenantPVs:
+                      description: |-
+                        CotenantPVs are the scoped PVs whose globalmount this remediation saw
+                        not healthy. Every pod using them is drained (kubelet only unstages a
+                        PV once no pod on the node uses it). The set only grows: a share that
+                        keeps flapping can probe fine for a moment, and dropping its co-tenants
+                        then would leave the globalmount pinned.
+                      items:
+                        type: string
+                      maxItems: 128
+                      type: array
+                      x-kubernetes-list-type: set
                     drainPods:
                       description: DrainPods are the pod instances that must be gone before releasing mounts.
                       items:

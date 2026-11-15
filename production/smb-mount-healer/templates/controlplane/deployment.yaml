@@ -1,6 +1,7 @@
 {{- $component := "controlplane" }}
 {{- $ctx := dict "context" . "component" $component }}
 {{- $r := .Values.controlplane.remediation }}
+{{- include "smb-mount-healer.validateVerifyWait" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -60,6 +60,7 @@ type Worker struct {
 	StartupGrace             time.Duration // STARTUP_GRACE (10s)
 	PodStartupGrace          time.Duration // POD_STARTUP_GRACE (60s)
 	SlowConfirmWindow        time.Duration // SLOW_CONFIRM_WINDOW (3m)
+	SlowRecoveryWindow       time.Duration // SLOW_RECOVERY_WINDOW (2m; 0: the first ok probe ends a slow streak)
 	ProbeConcurrency         int           // PROBE_CONCURRENCY (4)
 	StatusHeartbeat          time.Duration // STATUS_HEARTBEAT (5m)
 	QuarantineDir            string        // QUARANTINE_DIR ($KUBELET_ROOT/smb-mount-healer-quarantine)
@@ -82,7 +83,7 @@ type ControlPlane struct {
 	UnstageWait                 time.Duration // UNSTAGE_WAIT (30s)
 	QuarantineUnstageWait       time.Duration // QUARANTINE_UNSTAGE_WAIT (300s)
 	DriverRestartWait           time.Duration // DRIVER_RESTART_WAIT (90s)
-	VerifyWait                  time.Duration // VERIFY_WAIT (90s)
+	VerifyWait                  time.Duration // VERIFY_WAIT (3m; must exceed SLOW_RECOVERY_WINDOW + RECHECK_DELAY + STAT_TIMEOUT, checked by the chart)
 	VerifyNoPodGrace            time.Duration // VERIFY_NO_POD_GRACE (30s)
 	EpisodeMaxDuration          time.Duration // EPISODE_MAX_DURATION (30m)
 	BackoffBase                 time.Duration // BACKOFF_BASE (5m)
@@ -189,6 +190,7 @@ func parseWorker(e *env) Worker {
 		StartupGrace:             e.dur("STARTUP_GRACE", 10*time.Second),
 		PodStartupGrace:          e.dur("POD_STARTUP_GRACE", 60*time.Second),
 		SlowConfirmWindow:        e.dur("SLOW_CONFIRM_WINDOW", 3*time.Minute),
+		SlowRecoveryWindow:       e.dur("SLOW_RECOVERY_WINDOW", 2*time.Minute),
 		ProbeConcurrency:         int(e.integer("PROBE_CONCURRENCY", 4, 1024)),
 		StatusHeartbeat:          e.dur("STATUS_HEARTBEAT", 5*time.Minute),
 		QuarantineDir:            e.str("QUARANTINE_DIR", filepath.Join(root, "smb-mount-healer-quarantine")),
@@ -216,7 +218,7 @@ func parseControlPlane(e *env, v flagValues) ControlPlane {
 		UnstageWait:                 e.dur("UNSTAGE_WAIT", 30*time.Second),
 		QuarantineUnstageWait:       e.dur("QUARANTINE_UNSTAGE_WAIT", 300*time.Second),
 		DriverRestartWait:           e.dur("DRIVER_RESTART_WAIT", 90*time.Second),
-		VerifyWait:                  e.dur("VERIFY_WAIT", 90*time.Second),
+		VerifyWait:                  e.dur("VERIFY_WAIT", 3*time.Minute),
 		VerifyNoPodGrace:            e.dur("VERIFY_NO_POD_GRACE", 30*time.Second),
 		EpisodeMaxDuration:          e.dur("EPISODE_MAX_DURATION", 30*time.Minute),
 		BackoffBase:                 e.dur("BACKOFF_BASE", 5*time.Minute),
@@ -255,6 +257,9 @@ func (c Config) Validate() error {
 		})
 		if w.StartupGrace < 0 || w.PodStartupGrace < 0 {
 			add("STARTUP_GRACE and POD_STARTUP_GRACE must not be negative")
+		}
+		if w.SlowRecoveryWindow < 0 {
+			add("SLOW_RECOVERY_WINDOW must not be negative")
 		}
 		if w.RecheckAttempts < 1 {
 			add("RECHECK_ATTEMPTS must be >= 1")

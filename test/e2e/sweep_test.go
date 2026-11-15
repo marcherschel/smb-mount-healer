@@ -16,6 +16,7 @@ import (
 
 	"github.com/marcherschel/smb-mount-healer/api/v1alpha1"
 	"github.com/marcherschel/smb-mount-healer/internal/metrics"
+	"github.com/marcherschel/smb-mount-healer/internal/worker"
 	"github.com/marcherschel/smb-mount-healer/test/e2e/framework"
 )
 
@@ -78,7 +79,7 @@ func TestS6ShadowFiles(t *testing.T) {
 	rec := f.RecordSmbMounts()
 	cp0 := f.Metrics(metrics.ComponentControlPlane)
 	w0 := f.Metrics(metrics.ComponentWorker)
-	worker := workerPod(f)
+	wp := workerPod(f)
 	since := time.Now()
 
 	pv := framework.PV("config-a")
@@ -98,7 +99,7 @@ func TestS6ShadowFiles(t *testing.T) {
 			"quarantines{pv}:\n%s", w.Series(metrics.Quarantines))
 	}).Should(gomega.Succeed())
 	w := framework.Delta(w0, f.Metrics(metrics.ComponentWorker))
-	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, "quarantine", metrics.LabelResult, "succeeded")).To(gomega.Equal(1.0),
+	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, worker.ActionLabelQuarantine, metrics.LabelResult, worker.ResultLabelSucceeded)).To(gomega.Equal(1.0),
 		"host_actions{quarantine}:\n%s", w.After.Series(metrics.HostActionsTotal))
 	moved := 0
 	for _, res := range hostResults(f, r.Name)[v1alpha1.HostActionQuarantine] {
@@ -119,7 +120,7 @@ func TestS6ShadowFiles(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	g.Expect(string(raw)).NotTo(gomega.ContainSubstring(secret), "smbq YAML")
 	g.Expect(f.AllEventsText(since)).NotTo(gomega.ContainSubstring(secret), "events")
-	logs := f.PodLogs(framework.HealerNamespace, worker.Name, "", since)
+	logs := f.PodLogs(framework.HealerNamespace, wp.Name, "", since)
 	g.Expect(logs).NotTo(gomega.BeEmpty())
 	g.Expect(logs).To(gomega.ContainSubstring(q.Spec.Path), "worker logs mention the quarantine folder")
 	g.Expect(logs).NotTo(gomega.ContainSubstring(secret), "worker logs")
@@ -151,7 +152,7 @@ func TestS7OrphanPodDir(t *testing.T) {
 	q := checkQuarantined(f, r, pv, 1)
 	g.Expect(q.Spec.SourcePath).To(gomega.Equal(dir))
 	w := framework.Delta(w0, f.Metrics(metrics.ComponentWorker))
-	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, "quarantine", metrics.LabelResult, "succeeded")).To(gomega.Equal(1.0),
+	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, worker.ActionLabelQuarantine, metrics.LabelResult, worker.ResultLabelSucceeded)).To(gomega.Equal(1.0),
 		"host_actions{quarantine}:\n%s", w.After.Series(metrics.HostActionsTotal))
 	cp := framework.Delta(cp0, f.Metrics(metrics.ComponentControlPlane))
 	g.Expect(cp.Value(metrics.WorkloadActionsTotal, nil)).To(gomega.BeZero())
@@ -210,7 +211,7 @@ func TestS8DeadOrphanGlobalmount(t *testing.T) {
 	}
 	g.Expect(unmounted).To(gomega.BeTrue(), "a ForceUnmount succeeded")
 	w := framework.Delta(w0, f.Metrics(metrics.ComponentWorker))
-	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, "force_unmount", metrics.LabelResult, "succeeded")).To(gomega.Equal(1.0),
+	g.Expect(w.Get(metrics.HostActionsTotal, metrics.LabelAction, worker.ActionLabelForceUnmount, metrics.LabelResult, worker.ResultLabelSucceeded)).To(gomega.Equal(1.0),
 		"host_actions{force_unmount}:\n%s", w.After.Series(metrics.HostActionsTotal))
 	cp := framework.Delta(cp0, f.Metrics(metrics.ComponentControlPlane))
 	g.Expect(cp.Value(metrics.WorkloadActionsTotal, nil)).To(gomega.BeZero())

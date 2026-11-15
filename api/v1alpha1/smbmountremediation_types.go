@@ -53,6 +53,15 @@ type RemediationScope struct {
 	// +optional
 	// +kubebuilder:validation:MaxItems=512
 	DrainPods []PodRef `json:"drainPods,omitempty"`
+	// CotenantPVs are the scoped PVs whose globalmount this remediation saw
+	// not healthy. Every pod using them is drained (kubelet only unstages a
+	// PV once no pod on the node uses it). The set only grows: a share that
+	// keeps flapping can probe fine for a moment, and dropping its co-tenants
+	// then would leave the globalmount pinned.
+	// +optional
+	// +kubebuilder:validation:MaxItems=128
+	// +listType=set
+	CotenantPVs []string `json:"cotenantPVs,omitempty"`
 }
 
 // DeadGlobalmount is a globalmount found dead during the episode.
