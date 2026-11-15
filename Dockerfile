@@ -38,7 +38,7 @@ ARG REVISION=unknown
 LABEL org.opencontainers.image.title="smb-mount-healer" \
       org.opencontainers.image.description="Detects and heals broken SMB CSI mounts (controlplane + worker)" \
       org.opencontainers.image.source="https://github.com/marcherschel/smb-mount-healer" \
-      org.opencontainers.image.licenses="GPL-2.0-only" \
+      org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 
