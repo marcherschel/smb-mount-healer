@@ -218,4 +218,4 @@ mounts on a k3d cluster.
 
 ## License
 
-GPL-2.0-only. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE).

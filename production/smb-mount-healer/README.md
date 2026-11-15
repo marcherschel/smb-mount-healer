@@ -289,4 +289,4 @@ Kubernetes: `>=1.31.0-0`
 
 ## License
 
-GPL-2.0-only. See [LICENSE](https://github.com/marcherschel/smb-mount-healer/blob/main/LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/marcherschel/smb-mount-healer/blob/main/LICENSE).
