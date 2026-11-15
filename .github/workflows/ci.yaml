@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       # CI toolbox built from .github/ci-image (workflow ci-image.yaml).
-      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f240ac92682eea72cf37e1996724dd559d02797b@sha256:586218b4b8b19f8c211f1154e9753d149c6238d9c656d096e903255a19e1bdcc
       # make chart-test runs the pinned kubeconform and promtool images.
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
@@ -149,7 +149,7 @@ jobs:
     if: needs.changes.outputs.suite == 'full'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f240ac92682eea72cf37e1996724dd559d02797b@sha256:586218b4b8b19f8c211f1154e9753d149c6238d9c656d096e903255a19e1bdcc
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -186,7 +186,7 @@ jobs:
     if: needs.changes.outputs.suite == 'full'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f240ac92682eea72cf37e1996724dd559d02797b@sha256:586218b4b8b19f8c211f1154e9753d149c6238d9c656d096e903255a19e1bdcc
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -210,7 +210,7 @@ jobs:
     if: needs.changes.outputs.suite == 'full'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f240ac92682eea72cf37e1996724dd559d02797b@sha256:586218b4b8b19f8c211f1154e9753d149c6238d9c656d096e903255a19e1bdcc
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -244,7 +244,7 @@ jobs:
     if: needs.changes.outputs.suite == 'full'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f240ac92682eea72cf37e1996724dd559d02797b@sha256:586218b4b8b19f8c211f1154e9753d149c6238d9c656d096e903255a19e1bdcc
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -295,7 +295,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
-      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f240ac92682eea72cf37e1996724dd559d02797b@sha256:586218b4b8b19f8c211f1154e9753d149c6238d9c656d096e903255a19e1bdcc
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
     env:
