@@ -105,6 +105,13 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: smb-mount-healer
+      # Install only a chart signed by this repository's release workflow
+      # (cosign keyless; needs Flux >= 2.2). See "Signatures and SBOMs".
+      verify:
+        provider: cosign
+        matchOIDCIdentity:
+          - issuer: ^https://token\.actions\.githubusercontent\.com$
+            subject: ^https://github\.com/marcherschel/smb-mount-healer/\.github/workflows/release-chart\.yaml@refs/(heads/main|tags/chart-v.+)$
   values:
     # Enforcing: remediations scale workloads, unmount and quarantine.
     # Set true to only detect and plan (an emergency brake, too).
@@ -180,7 +187,17 @@ The image and the chart are signed with cosign (keyless, GitHub OIDC). Every
 app release ships SBOMs: the image carries a BuildKit SBOM per platform
 (SPDX), and the [GitHub release](https://github.com/marcherschel/smb-mount-healer/releases/latest)
 lists them as files next to the SPDX and CycloneDX SBOMs of the binaries.
-How to verify them: [SECURITY.md](https://github.com/marcherschel/smb-mount-healer/blob/main/SECURITY.md#verifying-a-release).
+Verify the chart before installing it:
+
+```sh
+cosign verify ghcr.io/marcherschel/charts/smb-mount-healer:A.B.C \
+  --certificate-identity-regexp '^https://github\.com/marcherschel/smb-mount-healer/\.github/workflows/release-chart\.yaml@refs/(heads/main|tags/chart-v)' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+With Flux, `chart.spec.verify` in the [quick start](#quick-start-with-flux)
+does the same check on every install and upgrade. How to verify the image,
+binaries and release files: [SECURITY.md](https://github.com/marcherschel/smb-mount-healer/blob/main/SECURITY.md#verifying-a-release).
 
 ## Uninstalling
 
