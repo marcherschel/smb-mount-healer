@@ -64,7 +64,7 @@ helm install smb-mount-healer oci://ghcr.io/marcherschel/charts/smb-mount-healer
 
 With Flux, let the source-controller check the signature before it installs:
 see the [Flux quick start](production/smb-mount-healer/README.md#quick-start-with-flux)
-(`chart.spec.verify`).
+(`spec.verify` on an OCIRepository, referenced by the HelmRelease's `chartRef`).
 
 ### Files on a GitHub release
 

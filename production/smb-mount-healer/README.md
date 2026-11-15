@@ -79,15 +79,31 @@ metadata:
     # The worker is privileged (it unmounts and moves directories on the host).
     pod-security.kubernetes.io/enforce: privileged
 ---
+# The chart comes from an OCIRepository, not a HelmRepository: only the
+# OCIRepository checks the cosign identity below. helm-controller drops
+# chart.spec.verify.matchOIDCIdentity when it builds the HelmChart, and the
+# keyless check then fails with "can't verify identities without providing
+# at least one identity".
 apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
+kind: OCIRepository
 metadata:
   name: smb-mount-healer
   namespace: smb-mount-healer-system
 spec:
-  type: oci
-  url: oci://ghcr.io/marcherschel/charts
   interval: 1h
+  url: oci://ghcr.io/marcherschel/charts/smb-mount-healer
+  ref:
+    semver: 0.2.x
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  # Accept only a chart signed by this repository's release workflow
+  # (cosign keyless, GitHub OIDC). See "Signatures and SBOMs".
+  verify:
+    provider: cosign
+    matchOIDCIdentity:
+      - issuer: ^https://token\.actions\.githubusercontent\.com$
+        subject: ^https://github\.com/marcherschel/smb-mount-healer/\.github/workflows/release-chart\.yaml@refs/(heads/main|tags/chart-v.+)$
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -96,20 +112,9 @@ metadata:
   namespace: smb-mount-healer-system
 spec:
   interval: 10m
-  chart:
-    spec:
-      chart: smb-mount-healer
-      version: 0.1.x
-      sourceRef:
-        kind: HelmRepository
-        name: smb-mount-healer
-      # Install only a chart signed by this repository's release workflow
-      # (cosign keyless; needs Flux >= 2.2). See "Signatures and SBOMs".
-      verify:
-        provider: cosign
-        matchOIDCIdentity:
-          - issuer: ^https://token\.actions\.githubusercontent\.com$
-            subject: ^https://github\.com/marcherschel/smb-mount-healer/\.github/workflows/release-chart\.yaml@refs/(heads/main|tags/chart-v.+)$
+  chartRef:
+    kind: OCIRepository
+    name: smb-mount-healer
   values:
     # Enforcing: remediations scale workloads, unmount and quarantine.
     # Set true to only detect and plan (an emergency brake, too).
@@ -193,8 +198,12 @@ cosign verify ghcr.io/marcherschel/charts/smb-mount-healer:A.B.C \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-With Flux, `chart.spec.verify` in the [quick start](#quick-start-with-flux)
-does the same check on every install and upgrade. How to verify the image,
+With Flux, `spec.verify` of the OCIRepository in the
+[quick start](#quick-start-with-flux) does the same check on every install and
+upgrade. Use an OCIRepository with `chartRef` for this, not
+`chart.spec.verify` on the HelmRelease: helm-controller does not pass
+`matchOIDCIdentity` on to the HelmChart it creates, so keyless verification
+fails there. How to verify the image,
 binaries and release files: [SECURITY.md](https://github.com/marcherschel/smb-mount-healer/blob/main/SECURITY.md#verifying-a-release).
 
 ## Uninstalling
