@@ -167,6 +167,14 @@ repository).
 `image.reference` (a full `repo:tag@digest`) wins over `image.repository`,
 `image.tag` (default: the chart's `appVersion`) and `image.digest`.
 
+### Signatures and SBOMs
+
+The image and the chart are signed with cosign (keyless, GitHub OIDC). Every
+app release ships SBOMs: the image carries a BuildKit SBOM per platform
+(SPDX), and the [GitHub release](https://github.com/marcherschel/smb-mount-healer/releases/latest)
+lists them as files next to the SPDX and CycloneDX SBOMs of the binaries.
+How to verify them: [SECURITY.md](https://github.com/marcherschel/smb-mount-healer/blob/main/SECURITY.md#verifying-a-release).
+
 ## Uninstalling
 
 With `crds.keep: true` (the default) `helm uninstall` leaves the CRDs and all
@@ -289,4 +297,4 @@ Kubernetes: `>=1.31.0-0`
 
 ## License
 
-GPL-2.0-only. See [LICENSE](https://github.com/marcherschel/smb-mount-healer/blob/main/LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/marcherschel/smb-mount-healer/blob/main/LICENSE).

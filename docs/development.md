@@ -17,7 +17,8 @@ Every tool and dependency version lives in one of two files (plain
   Kubernetes, the e2e k3s image, the csi-driver-smb chart the Tiltfile
   installs). A change runs the full CI suite.
 - [`tools.env`](../tools.env): support tools (k3d, tilt, helm, helm-docs,
-  golangci-lint, yq, oras). A change runs only the lint job.
+  golangci-lint, yq, oras, and syft for the release SBOMs). A change runs only
+  the lint job.
  `controller-gen` and `setup-envtest` are pinned through
 `tool` directives in `go.mod`. `make lint` and the chart targets download the
 pinned golangci-lint and helm into `bin/` when the installed version differs.
@@ -39,7 +40,7 @@ pinned golangci-lint and helm into `bin/` when the installed version differs.
 | `sim-update` | regenerate the `internal/sim` golden traces |
 | `build` | `bin/smb-mount-healer` |
 | `image` | `docker buildx` of `$(IMG)` (default `ghcr.io/marcherschel/smb-mount-healer:$(VERSION)`). Native single-arch `--load` by default; multi-arch push: `PLATFORMS=linux/amd64,linux/arm64 IMAGE_OUTPUT=--push`. |
-| `dist-app` | app release assets into `dist/app` for `VERSION`: static binaries (`RELEASE_PLATFORMS`), CRDs, `SHA256SUMS` (`hack/dist-app.sh`) |
+| `dist-app` | app release assets into `dist/app` for `VERSION`: static binaries (`RELEASE_PLATFORMS`), their SBOMs (syft), the image SBOMs of `SBOM_IMAGE` (optional), CRDs, `SHA256SUMS` (`hack/dist-app.sh`) |
 | `dist-chart` | chart release assets into `dist/chart`: package as committed, dashboard, rules, PrometheusRule, `SHA256SUMS` (`hack/dist-chart.sh`) |
 | `e2e` | the e2e suite on a throwaway k3d cluster, always deleted afterwards |
 | `e2e-up` / `e2e-run` / `e2e-dev` / `e2e-down` | k3d cluster `smbmh-e2e` (`rancher/k3s:K3S_VERSION`); `e2e-run` = `tilt ci` environment setup on `test/e2e/Tiltfile` (healer via the Helm chart) + `go test` suite; `e2e-dev` = `tilt up` |

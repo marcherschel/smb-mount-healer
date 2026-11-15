@@ -59,7 +59,7 @@ existing tags (`hack/next-version.sh`):
 | Tag | `vX.Y.Z` | `chart-vA.B.C` |
 | Workflow | `.github/workflows/release-app.yaml` | `.github/workflows/release-chart.yaml` |
 | Tag points at | the `main` commit, created once the CI suite passed on it | a release commit on top of `main` with the stamped `Chart.yaml` (reachable only from the tag) |
-| Publishes | `ghcr.io/marcherschel/smb-mount-healer:X.Y.Z`; GitHub release with static binaries, CRDs, `SHA256SUMS` (`make dist-app`) | `oci://ghcr.io/marcherschel/charts/smb-mount-healer` A.B.C; GitHub release with chart package, dashboard, rules, PrometheusRule, `SHA256SUMS` (`make dist-chart`) |
+| Publishes | `ghcr.io/marcherschel/smb-mount-healer:X.Y.Z`; GitHub release with static binaries, SBOMs (binaries: SPDX + CycloneDX; image: SPDX), CRDs, `SHA256SUMS` (`make dist-app`) | `oci://ghcr.io/marcherschel/charts/smb-mount-healer` A.B.C; GitHub release with chart package, dashboard, rules, PrometheusRule, `SHA256SUMS` (`make dist-chart`) |
 
 The app release runs the full CI suite first (unless skipped, see below);
 the chart release runs only the chart checks. Only versions with a
@@ -67,7 +67,10 @@ pre-release suffix (`-rc.1`, ...) are marked as prereleases. App releases
 become the repository's "Latest" release on GitHub (they carry the binaries
 and CRDs); chart releases never do, since the chart is installed from the
 OCI registry. Both workflows sign what they publish with cosign (keyless,
-GitHub OIDC).
+GitHub OIDC). The app release also publishes SBOMs: BuildKit attaches one per
+platform to the image, syft writes one per binary from its Go build info
+(`make dist-app`, pinned `SYFT_VERSION`), the GitHub release carries all of
+them, and each binary gets an SBOM attestation next to its provenance.
 
 ### App release
 

@@ -49,6 +49,14 @@ HELM ?= $(HELM_SYSTEM)
 endif
 endif
 HELM ?= $(LOCALBIN)/helm-$(HELM_VERSION)
+# syft (SBOMs of the release assets): same scheme.
+SYFT_SYSTEM := $(shell command -v syft 2>/dev/null)
+ifneq ($(SYFT_SYSTEM),)
+ifeq ($(shell $(SYFT_SYSTEM) version 2>/dev/null | awk '$$1 == "Version:" {print $$2}'),$(patsubst v%,%,$(SYFT_VERSION)))
+SYFT ?= $(SYFT_SYSTEM)
+endif
+endif
+SYFT ?= $(LOCALBIN)/syft-$(SYFT_VERSION)
 CHART := production/smb-mount-healer
 # Conservative defaults so lint fits a 4 GiB devcontainer; CI may override,
 # e.g. make lint LINT_FLAGS= LINT_ENV=
@@ -151,10 +159,13 @@ image: ## Build the container image $(IMG) for $(PLATFORMS).
 
 # Static release binaries (dist/app); the image build is `make image`.
 RELEASE_PLATFORMS ?= linux/amd64 linux/arm64
+# Optional: pushed image (repo@sha256:...) whose BuildKit SBOMs dist-app
+# exports too (release-app.yaml sets it).
+SBOM_IMAGE ?=
 
 .PHONY: dist-app
-dist-app: ## App release assets into dist/app: static binaries for RELEASE_PLATFORMS, CRDs, SHA256SUMS (VERSION).
-	VERSION=$(VERSION) REVISION=$(REVISION) PLATFORMS="$(RELEASE_PLATFORMS)" hack/dist-app.sh
+dist-app: $(SYFT) ## App release assets into dist/app: static binaries for RELEASE_PLATFORMS, their SBOMs, CRDs, SHA256SUMS (VERSION).
+	VERSION=$(VERSION) REVISION=$(REVISION) PLATFORMS="$(RELEASE_PLATFORMS)" SYFT=$(SYFT) SBOM_IMAGE="$(SBOM_IMAGE)" hack/dist-app.sh
 
 .PHONY: dist-chart
 dist-chart: $(HELM) ## Chart release assets into dist/chart: package, dashboard, rules, PrometheusRule, CRDs, SHA256SUMS.
@@ -223,6 +234,9 @@ $(LOCALBIN)/golangci-lint-%: ## Download the pinned golangci-lint release into b
 $(LOCALBIN)/helm-%: ## Download the pinned helm release into bin/ (sha256-verified).
 	HELM_VERSION=$* INSTALL_DIR=$(LOCALBIN) BIN_NAME=helm-$* hack/tools/install.sh helm
 
+$(LOCALBIN)/syft-%: ## Download the pinned syft release into bin/ (sha256-verified).
+	SYFT_VERSION=$* INSTALL_DIR=$(LOCALBIN) BIN_NAME=syft-$* hack/tools/install.sh syft
+
 .PHONY: tools
-tools: ## Install kubectl, helm, k3d, tilt, golangci-lint, yq and oras at the versions.env/tools.env pins into ~/.local/bin.
+tools: ## Install kubectl, helm, k3d, tilt, golangci-lint, yq, oras and syft at the versions.env/tools.env pins into ~/.local/bin.
 	hack/tools/install.sh

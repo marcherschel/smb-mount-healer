@@ -11,8 +11,10 @@ name: release-app
 #   ghcr.io/<owner>/smb-mount-healer:X.Y.Z   image (linux/amd64 + linux/arm64,
 #                                            SBOM, provenance attestation)
 #   GitHub release vX.Y.Z with dist/app (make dist-app): static binaries
-#   smb-mount-healer-linux-{amd64,arm64} (with provenance attestation), the
-#   CRDs of this API version, SHA256SUMS.
+#   smb-mount-healer-linux-{amd64,arm64} (with provenance and SBOM
+#   attestations), their SBOMs (.spdx.json, .cdx.json), the image SBOMs
+#   (smb-mount-healer-image-linux-{amd64,arm64}.spdx.json), the CRDs of this
+#   API version, SHA256SUMS.
 # The chart is released separately (tags chart-v*, release-chart.yaml); every
 # chart release pins the latest stable app release as its appVersion.
 # The full CI suite (lint, unit, envtest, e2e) gates every publish step,
@@ -180,7 +182,7 @@ jobs:
       id-token: write # attestations
       attestations: write
     container:
-      image: ghcr.io/marcherschel/smb-mount-healer-ci:f1efcd46699ef82731693ce4300bc2953eaadfd5@sha256:55dd187dd2852259466ccf44a85c585636ee5455de50a0cb3d886caba0caf4d7
+      image: ghcr.io/marcherschel/smb-mount-healer-ci:f240ac92682eea72cf37e1996724dd559d02797b@sha256:586218b4b8b19f8c211f1154e9753d149c6238d9c656d096e903255a19e1bdcc
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
     env:
@@ -230,14 +232,31 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - name: Build release binaries (make dist-app)
+      # Binaries, their SBOMs (syft) and the image SBOMs BuildKit attached
+      # to the image just pushed.
+      - name: Build release binaries and SBOMs (make dist-app)
         env:
           VERSION: ${{ needs.plan.outputs.version }}
-        run: make dist-app VERSION="$VERSION"
+          SBOM_IMAGE: ${{ env.IMAGE_REPO }}@${{ steps.push.outputs.digest }}
+        run: make dist-app VERSION="$VERSION" SBOM_IMAGE="$SBOM_IMAGE"
 
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: dist/app/smb-mount-healer-linux-*
+          subject-path: |
+            dist/app/smb-mount-healer-linux-amd64
+            dist/app/smb-mount-healer-linux-arm64
+
+      # One SBOM attestation per binary (its own SPDX SBOM):
+      # gh attestation verify <binary> --repo <owner>/smb-mount-healer --predicate-type https://spdx.dev/Document/v2.3
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/app/smb-mount-healer-linux-amd64
+          sbom-path: dist/app/smb-mount-healer-linux-amd64.spdx.json
+
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/app/smb-mount-healer-linux-arm64
+          sbom-path: dist/app/smb-mount-healer-linux-arm64.spdx.json
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
