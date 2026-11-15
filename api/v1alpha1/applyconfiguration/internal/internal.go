@@ -232,6 +232,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.marcherschel.smb-mount-healer.api.v1alpha1.RemediationScope
   map:
     fields:
+    - name: cotenantPVs
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
     - name: drainPods
       type:
         list:

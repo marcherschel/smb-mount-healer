@@ -11,6 +11,12 @@ type RemediationScopeApplyConfiguration struct {
 	PVs       []string                           `json:"pvs,omitempty"`
 	// DrainPods are the pod instances that must be gone before releasing mounts.
 	DrainPods []PodRefApplyConfiguration `json:"drainPods,omitempty"`
+	// CotenantPVs are the scoped PVs whose globalmount this remediation saw
+	// not healthy. Every pod using them is drained (kubelet only unstages a
+	// PV once no pod on the node uses it). The set only grows: a share that
+	// keeps flapping can probe fine for a moment, and dropping its co-tenants
+	// then would leave the globalmount pinned.
+	CotenantPVs []string `json:"cotenantPVs,omitempty"`
 }
 
 // RemediationScopeApplyConfiguration constructs a declarative configuration of the RemediationScope type for use with
@@ -51,6 +57,16 @@ func (b *RemediationScopeApplyConfiguration) WithDrainPods(values ...*PodRefAppl
 			panic("nil value passed to WithDrainPods")
 		}
 		b.DrainPods = append(b.DrainPods, *values[i])
+	}
+	return b
+}
+
+// WithCotenantPVs adds the given value to the CotenantPVs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the CotenantPVs field.
+func (b *RemediationScopeApplyConfiguration) WithCotenantPVs(values ...string) *RemediationScopeApplyConfiguration {
+	for i := range values {
+		b.CotenantPVs = append(b.CotenantPVs, values[i])
 	}
 	return b
 }

@@ -25,7 +25,9 @@ controlplane:
     unstageWait: 10s
     quarantineUnstageWait: 60s
     driverRestartWait: 30s
-    verifyWait: 45s
+    # Longer than slowRecoveryWindow (60s) + recheckDelay + statTimeout: a
+    # replacement pod with one slow probe stays Suspect that long.
+    verifyWait: 90s
     verifyNoPodGrace: 15s
     backoffBase: 20s
 

@@ -133,6 +133,15 @@ func (m *machine) planWorkloadScope() plannedScope {
 			addPod(p)
 		}
 	}
+	// Co-tenant PVs recorded earlier stay co-tenant (see
+	// RemediationScope.CotenantPVs); a PV joins when its globalmount is not
+	// healthy now.
+	if m.st.Scope != nil {
+		for _, pv := range m.st.Scope.CotenantPVs {
+			ps.pvs[pv] = true
+			ps.cotenants[pv] = true
+		}
+	}
 	for pv := range ps.pvs {
 		if !m.idx.globalmountHealthy(pv) {
 			ps.cotenants[pv] = true
@@ -212,6 +221,11 @@ func (m *machine) mergeScope(ps plannedScope) *v1alpha1.RemediationScope {
 	sort.Strings(sc.PVs)
 	if len(sc.PVs) > maxScopePVs {
 		sc.PVs = sc.PVs[:maxScopePVs]
+	}
+	for _, pv := range sc.PVs {
+		if ps.cotenants[pv] {
+			sc.CotenantPVs = append(sc.CotenantPVs, pv)
+		}
 	}
 	for uid, ref := range ps.drain {
 		p := m.idx.podByUID[uid]
@@ -338,16 +352,22 @@ func (m *machine) deadGlobalmounts(pvs []string, brokenOnly bool) []v1alpha1.Dea
 	return out
 }
 
-// cotenantPVs are the scoped PVs whose globalmount is currently not healthy:
-// every pod using them must leave the node before kubelet re-stages.
+// cotenantPVs are the scoped PVs whose globalmount this remediation has
+// seen not healthy (recorded, or not healthy now): every pod using them must
+// leave the node before kubelet re-stages. A PV that is not healthy now is
+// recorded in Scope.CotenantPVs, so it stays co-tenant when the next probe
+// of a flapping share happens to succeed.
 func (m *machine) cotenantPVs() []string {
-	var out []string
+	if m.st.Scope == nil {
+		return nil
+	}
 	for _, pv := range m.scopePVs() {
-		if !m.idx.globalmountHealthy(pv) {
-			out = append(out, pv)
+		if !m.idx.globalmountHealthy(pv) && !containsString(m.st.Scope.CotenantPVs, pv) {
+			m.st.Scope.CotenantPVs = append(m.st.Scope.CotenantPVs, pv)
+			sort.Strings(m.st.Scope.CotenantPVs)
 		}
 	}
-	return out
+	return m.st.Scope.CotenantPVs
 }
 
 // ---------------- host tasks ----------------

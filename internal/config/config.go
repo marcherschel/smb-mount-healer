@@ -83,7 +83,7 @@ type ControlPlane struct {
 	UnstageWait                 time.Duration // UNSTAGE_WAIT (30s)
 	QuarantineUnstageWait       time.Duration // QUARANTINE_UNSTAGE_WAIT (300s)
 	DriverRestartWait           time.Duration // DRIVER_RESTART_WAIT (90s)
-	VerifyWait                  time.Duration // VERIFY_WAIT (90s)
+	VerifyWait                  time.Duration // VERIFY_WAIT (3m; must exceed SLOW_RECOVERY_WINDOW + RECHECK_DELAY + STAT_TIMEOUT, checked by the chart)
 	VerifyNoPodGrace            time.Duration // VERIFY_NO_POD_GRACE (30s)
 	EpisodeMaxDuration          time.Duration // EPISODE_MAX_DURATION (30m)
 	BackoffBase                 time.Duration // BACKOFF_BASE (5m)
@@ -218,7 +218,7 @@ func parseControlPlane(e *env, v flagValues) ControlPlane {
 		UnstageWait:                 e.dur("UNSTAGE_WAIT", 30*time.Second),
 		QuarantineUnstageWait:       e.dur("QUARANTINE_UNSTAGE_WAIT", 300*time.Second),
 		DriverRestartWait:           e.dur("DRIVER_RESTART_WAIT", 90*time.Second),
-		VerifyWait:                  e.dur("VERIFY_WAIT", 90*time.Second),
+		VerifyWait:                  e.dur("VERIFY_WAIT", 3*time.Minute),
 		VerifyNoPodGrace:            e.dur("VERIFY_NO_POD_GRACE", 30*time.Second),
 		EpisodeMaxDuration:          e.dur("EPISODE_MAX_DURATION", 30*time.Minute),
 		BackoffBase:                 e.dur("BACKOFF_BASE", 5*time.Minute),

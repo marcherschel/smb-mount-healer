@@ -60,7 +60,7 @@ Control plane:
 | `UNSTAGE_WAIT` | 30s |
 | `QUARANTINE_UNSTAGE_WAIT` | 300s |
 | `DRIVER_RESTART_WAIT` | 90s |
-| `VERIFY_WAIT` | 90s |
+| `VERIFY_WAIT` | 3m (must be longer than `SLOW_RECOVERY_WINDOW` + `RECHECK_DELAY` + `STAT_TIMEOUT`; the chart checks it) |
 | `VERIFY_NO_POD_GRACE` | 30s |
 | `EPISODE_MAX_DURATION` | 30m |
 | `BACKOFF_BASE` | 5m |

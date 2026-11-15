@@ -226,7 +226,7 @@ Kubernetes: `>=1.31.0-0`
 | controlplane.remediation.unstageWait | string | `"30s"` | `UNSTAGE_WAIT`: how long to wait for the CSI driver to unstage the globalmount. |
 | controlplane.remediation.quarantineUnstageWait | string | `"300s"` | `QUARANTINE_UNSTAGE_WAIT`: unstage wait when the mount point holds local data that must be quarantined. |
 | controlplane.remediation.driverRestartWait | string | `"90s"` | `DRIVER_RESTART_WAIT`: how long to wait for the restarted CSI node driver pod to become ready. |
-| controlplane.remediation.verifyWait | string | `"90s"` | `VERIFY_WAIT`: how long to wait for the scaled-up workload to be healthy again. |
+| controlplane.remediation.verifyWait | string | `"3m"` | `VERIFY_WAIT`: how long to wait for the scaled-up workload to be healthy again. Must be longer than `worker.probing.slowRecoveryWindow` + `recheckDelay` + `statTimeout` (the chart refuses to render otherwise): a replacement pod whose mount saw one slow probe stays Suspect that long. |
 | controlplane.remediation.verifyNoPodGrace | string | `"30s"` | `VERIFY_NO_POD_GRACE`: grace period before a workload without pods counts as verified. |
 | controlplane.remediation.episodeMaxDuration | string | `"30m"` | `EPISODE_MAX_DURATION`: an episode running longer is rolled back. |
 | controlplane.remediation.backoffBase | string | `"5m"` | `BACKOFF_BASE`: base of the exponential backoff between episodes for the same mount. |
