@@ -24,7 +24,7 @@
 set -euo pipefail
 
 ignored='(\.md$)|(\.(png|gif|svg|mp4)$)|(^docs/demo/)'
-ignored+='|(^\.github/workflows/(renovate|release-app|release-chart|ci-image)\.yaml$)|(^\.github/chainguard/)'
+ignored+='|(^\.github/workflows/(renovate|release-app|release-chart|ci-image|scorecard|codeql)\.yaml$)|(^\.github/chainguard/)'
 ignored+='|(^\.github/ci-image/)|(^\.devcontainer/)|(^hack/tools/install\.sh$)'
 ignored+='|(^Dockerfile$)|(^hack/(dist-app|dist-chart|next-version|stamp-chart)\.sh$)'
 ignored+='|(^LICENSE$)|(^\.gitignore$)|(^renovate\.json$)'

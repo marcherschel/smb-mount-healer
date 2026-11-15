@@ -65,6 +65,8 @@ check none docs/runbooks/SmbMountHealerRemediationFailed.md
 check none docs/demo/realistic-env.sh
 check none docs/logo.svg
 check none .github/workflows/renovate.yaml
+check none .github/workflows/scorecard.yaml
+check none .github/workflows/codeql.yaml
 check none .github/workflows/release-app.yaml
 check none .github/chainguard/renovate.sts.yaml
 check none .github/ci-image/Dockerfile
