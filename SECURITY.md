@@ -17,6 +17,30 @@ an answer within a week.
 
 Only the latest release receives fixes while the project is `0.x`.
 
+## Verifying a release
+
+Every app release is signed and comes with provenance and SBOMs:
+
+```sh
+# Image: cosign signature, SLSA provenance, BuildKit SBOM (per platform)
+cosign verify ghcr.io/marcherschel/smb-mount-healer:X.Y.Z \
+  --certificate-identity-regexp '^https://github.com/marcherschel/smb-mount-healer/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/marcherschel/smb-mount-healer:X.Y.Z --repo marcherschel/smb-mount-healer
+docker buildx imagetools inspect ghcr.io/marcherschel/smb-mount-healer:X.Y.Z \
+  --format '{{ json (index .SBOM "linux/amd64").SPDX }}'
+
+# Binary from the GitHub release: provenance and SBOM attestation
+gh attestation verify smb-mount-healer-linux-amd64 --repo marcherschel/smb-mount-healer
+gh attestation verify smb-mount-healer-linux-amd64 --repo marcherschel/smb-mount-healer \
+  --predicate-type https://spdx.dev/Document/v2.3
+```
+
+The GitHub release also carries the SBOMs as files: per binary
+`smb-mount-healer-linux-<arch>.spdx.json` and `.cdx.json` (CycloneDX), per
+image platform `smb-mount-healer-image-linux-<arch>.spdx.json`, all listed in
+`SHA256SUMS`. Feed them to a scanner, e.g. `grype sbom:smb-mount-healer-linux-amd64.spdx.json`.
+
 ## Hardening notes
 
 - The control plane runs as non-root with a read-only root filesystem; only

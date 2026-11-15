@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the pinned developer tools from versions.env, sha256-verified.
 #
-#   hack/tools/install.sh [tool...]   tools: kubectl helm k3d tilt golangci-lint yq oras
+#   hack/tools/install.sh [tool...]   tools: kubectl helm k3d tilt golangci-lint yq oras syft
 #                                     (default: all of them)
 #
 # Environment:
@@ -107,15 +107,24 @@ install_oras() {
   place oras "$TMP/oras"
 }
 
+install_syft() {
+  local v=${SYFT_VERSION#v}
+  local name="syft_${v}_linux_${ARCH}.tar.gz" base="https://github.com/anchore/syft/releases/download/${SYFT_VERSION}"
+  curl --retry 5 --retry-all-errors --retry-delay 2 -fsSLo "$TMP/$name" "$base/$name"
+  verify "$TMP/$name" "$(curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "$base/syft_${v}_checksums.txt" | awk -v f="$name" '$2 == f {print $1}')"
+  tar -xzf "$TMP/$name" -C "$TMP" syft
+  place syft "$TMP/syft"
+}
+
 tools=("$@")
-[[ ${#tools[@]} -eq 0 ]] && tools=(kubectl helm k3d tilt golangci-lint yq oras)
+[[ ${#tools[@]} -eq 0 ]] && tools=(kubectl helm k3d tilt golangci-lint yq oras syft)
 if [[ ${#tools[@]} -gt 1 && -n "${BIN_NAME:-}" ]]; then
   echo "BIN_NAME only works with a single tool" >&2
   exit 2
 fi
 for t in "${tools[@]}"; do
   case "$t" in
-    kubectl | helm | k3d | tilt | golangci-lint | yq | oras) "install_$t" ;;
+    kubectl | helm | k3d | tilt | golangci-lint | yq | oras | syft) "install_$t" ;;
     *) echo "unknown tool: $t" >&2; exit 2 ;;
   esac
 done
