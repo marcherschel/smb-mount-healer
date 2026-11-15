@@ -48,6 +48,11 @@ helm test smb-mount-healer -n smb-mount-healer-system
 kubectl get smbm,smbr,smbq
 ```
 
+Before installing, read
+[when not to use this](https://github.com/marcherschel/smb-mount-healer/blob/main/docs/failure-modes.md#when-not-to-use-this):
+the healer scales the whole owning Deployment/StatefulSet to 0, which
+hurts RWX workloads spread over many nodes and quorum-based StatefulSets.
+
 Want to try it out first? Install with `--set dryRun=true` (see
 [Dry run](#dry-run)) and switch it off later with
 `helm upgrade ... --reuse-values --set dryRun=false`.

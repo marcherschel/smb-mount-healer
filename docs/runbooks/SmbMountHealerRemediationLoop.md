@@ -49,6 +49,8 @@ Read the transitions of consecutive episodes; the reasons tell the cause:
 - **`verify_timeout` with verification `failed`**: the share comes back broken after the driver restart, so the SMB server itself is likely unreachable or the credentials are wrong. Check the `csi-smb-node` driver logs (`-c smb`) on the node.
 - **Quarantine actions on every episode** (`kubectl get smbq`): non-empty globalmount or orphaned pod dirs keep blocking the unstage.
 
+See also [failure-modes.md](../failure-modes.md): [pinned volumes](../failure-modes.md#a-pod-the-healer-cant-scale-pins-the-volume), [scale fighters](../failure-modes.md#something-scales-the-workload-back-up), [expired credentials](../failure-modes.md#expired-or-rotated-credentials) and [when not to use the healer](../failure-modes.md#when-not-to-use-this).
+
 ## Mitigation
 
 - **Stop a running episode**: `kubectl annotate smbr <name> smbhealer.herschel.io/abort=true` sends it to `rolling_back`, which scales every workload in scope back to its original replicas. Deleting the `smbr` does the same through its finalizer.
