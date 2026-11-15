@@ -110,7 +110,8 @@ Env knobs:
 | Variable | Used by | Meaning |
 |---|---|---|
 | `E2E_KUBE_CONTEXT` | framework | kubeconfig context (default: current context). Tilt sets it. |
-| `E2E_BASELINE_TIMEOUT` | framework | how long `WaitBaseline` waits (Go duration, default 10m) |
+| `E2E_BASELINE_TIMEOUT` | framework | how long `WaitBaseline` waits (Go duration, default 10m); once it timed out in a test, that test's cleanup wait is skipped |
+| `E2E_MAX_BASELINE_FAILURES` | `hack/go-test.sh` | stop the suite after this many tests in a row could not get the cluster back to baseline; the rest are listed as `=== NOT RUN` (default 2, `0` = never stop) |
 | `E2E_GO_TEST_FLAGS` | Tiltfile, `make e2e-run` | extra `go test` flags |
 | `E2E_LOG_DIR` | Tiltfile, `make e2e-run` | where the `<cluster>.{tilt,go-test}.log` files go (default `test/e2e/_runs`) |
 | `SMBMH_E2E_SETUP_ONLY=1` | Tiltfile | no `e2e-tests` resource (`make e2e-run` sets it and runs `go test` itself, because tilt ci would report the pods the suite kills on purpose as errors) |

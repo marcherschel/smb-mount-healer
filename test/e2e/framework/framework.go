@@ -85,6 +85,9 @@ type F struct {
 	remediationsAtStart map[string]bool
 	// baselined: the test's first WaitBaseline returned (see resetHistory).
 	baselined bool
+	// baselineFailed: a WaitBaseline of this test timed out; later ones
+	// (the cleanup) return at once.
+	baselineFailed bool
 }
 
 // The suite only uses controller-runtime's client; silence its logger.
