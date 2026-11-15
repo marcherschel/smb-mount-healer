@@ -15,7 +15,7 @@ set -euo pipefail
 HEALER_NS=smb-mount-healer-system
 # Fallback for collect_dmesg; same image as the chaos DaemonSet.
 # renovate: datasource=docker depName=alpine
-DMESG_IMAGE=alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+DMESG_IMAGE=alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
 # Full id of the container this script runs in. Docker bind-mounts
 # /var/lib/docker/containers/<id>/{hostname,hosts,resolv.conf} into every
